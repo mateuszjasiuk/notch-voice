@@ -20,7 +20,11 @@ struct NotchRootView: View {
             prompt: state.prompt,
             pendingCount: state.pendingCount,
             hasSessions: state.hasSessions,
+            sessionsListHeight: state.sessionsListHeight,
             speech: speech,
+            setSessionsListHeight: { height in
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) { state.sessionsListHeight = height }
+            },
             setEnabled: voice.setEnabled,
             answer: answer,
             openSettings: openSettings
@@ -38,14 +42,16 @@ struct NotchView: View {
     let prompt: PermissionPrompt?
     let pendingCount: Int
     let hasSessions: Bool
+    let sessionsListHeight: CGFloat
     let speech: SpeechCenter
+    let setSessionsListHeight: @MainActor (CGFloat) -> Void
     let setEnabled: @MainActor (Bool) -> Void
     let answer: @MainActor (UUID, PermissionResponse) -> Void
     let openSettings: @MainActor () -> Void
 
     var body: some View {
         let isExpanded = isOpen || prompt != nil
-        let size = prompt != nil ? metrics.permissionSize : isOpen ? metrics.openSize(hasSessions: hasSessions) : metrics.closedSize
+        let size = prompt != nil ? metrics.permissionSize : isOpen ? metrics.openSize(hasSessions: hasSessions, listHeight: sessionsListHeight) : metrics.closedSize
         let topRadius = isExpanded ? NotchMetrics.openTopRadius : NotchMetrics.closedTopRadius
         let bottomRadius = isExpanded ? NotchMetrics.openBottomRadius : NotchMetrics.closedBottomRadius
         let showsBody = isExpanded || isGlowing
@@ -80,7 +86,7 @@ struct NotchView: View {
                     )
                     .frame(height: metrics.openSize.height - metrics.notch.height)
                     if hasSessions {
-                        SessionsPanel(speech: speech, accent: theme.accent)
+                        SessionsPanel(speech: speech, accent: theme.accent, setListHeight: setSessionsListHeight)
                     }
                 }
                 .padding(.top, metrics.notch.height)

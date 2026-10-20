@@ -5,6 +5,8 @@ import SwiftUI
 struct SessionsPanel: View {
     @ObservedObject var speech: SpeechCenter
     let accent: LinearGradient
+    // Tells the notch how tall the list is, so it grows to fit it up to a limit and scrolls past that.
+    let setListHeight: @MainActor (CGFloat) -> Void
     @State private var expanded: Set<String> = []
 
     var body: some View {
@@ -12,7 +14,7 @@ struct SessionsPanel: View {
             NowPlayingRow(speech: speech, accent: accent)
             Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1)
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 2) {
                     ForEach(speech.sessions.sessions) { session in
                         SessionRow(
                             session: session,
@@ -29,8 +31,11 @@ struct SessionsPanel: View {
                         }
                     }
                 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height.rounded(.up) } action: { height in
+                    setListHeight(height)
+                }
             }
-            .scrollIndicators(.never)
+            .scrollIndicators(.automatic)
         }
         .padding(.horizontal, 18)
         .padding(.bottom, 14)

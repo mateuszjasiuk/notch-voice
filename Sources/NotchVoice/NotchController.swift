@@ -14,7 +14,11 @@ struct NotchMetrics: Equatable {
 
     var closedSize: CGSize { CGSize(width: notch.width + 2 * Self.closedTopRadius, height: notch.height) }
     var openSize: CGSize { CGSize(width: max(360, notch.width + 170), height: notch.height + 58) }
-    var sessionsSize: CGSize { CGSize(width: max(460, notch.width + 270), height: notch.height + 58 + 280) }
+    // The sessions part grows with its list up to this height, then scrolls. The rows above the list take 59 points.
+    static let sessionsMaxHeight: CGFloat = 320
+    static let sessionsChromeHeight: CGFloat = 59
+
+    var sessionsSize: CGSize { CGSize(width: max(460, notch.width + 270), height: notch.height + 58 + Self.sessionsMaxHeight) }
     var permissionSize: CGSize { CGSize(width: max(440, notch.width + 250), height: notch.height + 152) }
     var windowSize: CGSize {
         CGSize(
@@ -24,8 +28,10 @@ struct NotchMetrics: Equatable {
     }
 
     // Once a session has replied, the open notch also lists the sessions.
-    func openSize(hasSessions: Bool) -> CGSize {
-        hasSessions ? sessionsSize : openSize
+    func openSize(hasSessions: Bool, listHeight: CGFloat) -> CGSize {
+        guard hasSessions else { return openSize }
+        let sessions = min(Self.sessionsChromeHeight + listHeight, Self.sessionsMaxHeight)
+        return CGSize(width: sessionsSize.width, height: openSize.height + sessions)
     }
 
     @MainActor
@@ -49,6 +55,7 @@ final class NotchState: ObservableObject {
     @Published var prompt: PermissionPrompt?
     @Published var pendingCount = 0
     @Published var hasSessions = false
+    @Published var sessionsListHeight: CGFloat = 0
     @Published var metrics = NotchMetrics(notch: CGSize(width: 185, height: 32), hasNotch: false)
 }
 
@@ -126,7 +133,7 @@ final class NotchController {
     }
 
     private var panelZone: CGRect {
-        let size = state.metrics.openSize(hasSessions: state.hasSessions)
+        let size = state.metrics.openSize(hasSessions: state.hasSessions, listHeight: state.sessionsListHeight)
         return CGRect(x: screenFrame.midX - size.width / 2, y: screenFrame.maxY - size.height, width: size.width, height: size.height + 8)
     }
 
