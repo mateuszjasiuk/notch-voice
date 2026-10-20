@@ -8,6 +8,8 @@
   nv skip                      go on to the next reply in the queue
   nv stop                      stop reading and empty the queue
   nv mute <session>            stop reading a session's replies; nv unmute <session> turns them back on
+  nv focus [folder]            treat the session in this folder's git worktree as the one you're working in, as if
+                               you had just written to it (for editor hooks; the folder defaults to the current one)
   nv main [session]            make a session the main one: its replies are read, the others only announced.
                                Inside Claude Code, without a session, it's that session. nv main off undoes it.
   nv say <text>                read any text; with no text, or "-", it reads standard input
@@ -23,7 +25,7 @@ import sys
 import tempfile
 
 DARWIN_USER_TEMP_DIR = 65537  # _CS_DARWIN_USER_TEMP_DIR in <unistd.h>
-COMMANDS = ("list", "read", "history", "next", "skip", "stop", "mute", "unmute", "main", "say")
+COMMANDS = ("list", "read", "history", "next", "skip", "stop", "mute", "unmute", "focus", "main", "say")
 
 
 def user_temp_dir():
@@ -71,6 +73,10 @@ def request_for(command, args, stdin=sys.stdin):
         if len(args) != 1:
             raise UsageError(f"nv {command} needs a session.")
         return {"type": command, "session": args[0]}
+    if command == "focus":
+        if len(args) > 1:
+            raise UsageError("nv focus takes one folder at most.")
+        return {"type": "focus", "root": worktree_root(os.path.abspath(os.path.expanduser(args[0] if args else os.getcwd())))}
     if command == "main":
         if len(args) > 1:
             raise UsageError("nv main takes one session at most.")
@@ -100,6 +106,17 @@ def mark_spoken():
         open(os.path.join(SPOKEN_DIR, session_id), "w").close()
     except OSError:
         pass
+
+
+def worktree_root(folder):
+    """The same root speak.py sends with each reply: the git worktree, or the folder itself outside git."""
+    try:
+        result = subprocess.run(["git", "-C", folder, "rev-parse", "--show-toplevel"], capture_output=True, text=True, timeout=2)
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return os.path.normpath(folder)
 
 
 def send(request):

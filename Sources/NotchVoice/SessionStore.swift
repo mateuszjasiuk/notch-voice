@@ -18,6 +18,8 @@ struct Session: Identifiable, Equatable {
     var name: String
     var requestedName: String
     var cwd: String?
+    // The git worktree the session works in, or its folder when there is none.
+    var root: String?
     var replies: [Reply] = []
     var isMuted = false
     var lastActivity: Date
@@ -64,7 +66,7 @@ struct SessionStore {
     private(set) var sessions: [Session] = []
 
     @discardableResult
-    mutating func add(sessionID: String, name: String, cwd: String?, text: String, date: Date = .now) -> Reply {
+    mutating func add(sessionID: String, name: String, cwd: String?, root: String? = nil, text: String, date: Date = .now) -> Reply {
         let requested = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "session" : name
         let reply = Reply(id: UUID(), text: text, date: date)
         var session = sessions.first { $0.id == sessionID }
@@ -75,6 +77,7 @@ struct SessionStore {
             session.name = uniqueName(requested)
         }
         session.cwd = cwd ?? session.cwd
+        session.root = root ?? session.root
         session.lastActivity = date
         session.replies.append(reply)
         session.replies.removeFirst(max(0, session.replies.count - Self.historyLimit))

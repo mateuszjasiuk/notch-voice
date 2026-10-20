@@ -58,8 +58,15 @@ final class SpeechCenter: ObservableObject {
     @Published private(set) var sessions = SessionStore()
     @Published private(set) var playback = PlaybackQueue()
     var mode: () -> ReadingMode = { .focusedSession }
-    // The session the user last wrote a prompt to, from notchvoice_brief.py.
-    private(set) var focusedSessionID: String?
+    enum Focus: Equatable {
+        // The session the user last wrote a prompt to, from notchvoice_brief.py.
+        case session(String)
+        // A worktree the user switched to in their editor, from nv focus.
+        case folder(String)
+    }
+
+    // Whichever came last: a prompt, or the editor.
+    private(set) var focus: Focus?
     // The session the user chose as main, with /main, nv main or the star in the notch. It wins over the last prompt.
     @Published private(set) var mainSessionID: String?
 
@@ -79,8 +86,8 @@ final class SpeechCenter: ObservableObject {
         }
     }
 
-    func receive(sessionID: String, name: String, cwd: String?, text: String, date: Date) {
-        let reply = sessions.add(sessionID: sessionID, name: name, cwd: cwd, text: text, date: date)
+    func receive(sessionID: String, name: String, cwd: String?, root: String?, text: String, date: Date) {
+        let reply = sessions.add(sessionID: sessionID, name: name, cwd: cwd, root: root, text: text, date: date)
         guard let session = sessions.session(id: sessionID) else { return }
         voice.refresh()
         guard voice.isEnabled, !session.isMuted else { return }
@@ -95,8 +102,8 @@ final class SpeechCenter: ObservableObject {
         }
     }
 
-    func focus(sessionID: String) {
-        focusedSessionID = sessionID
+    func setFocus(_ focus: Focus) {
+        self.focus = focus
     }
 
     func setMain(sessionID: String?) {
@@ -106,8 +113,13 @@ final class SpeechCenter: ObservableObject {
     // Before the first prompt there is nothing to go on, so every session counts. Desktop chats have no prompt hook,
     // and their speak tool is only called in the chat the user is looking at.
     private func isFocused(_ session: Session) -> Bool {
-        guard let focused = mainSessionID ?? focusedSessionID else { return true }
-        return session.id == focused || session.id == "claude-desktop"
+        if session.id == "claude-desktop" { return true }
+        if let mainSessionID { return session.id == mainSessionID }
+        switch focus {
+        case nil: return true
+        case .session(let id): return session.id == id
+        case .folder(let folder): return session.root == folder || session.cwd == folder
+        }
     }
 
     func say(_ text: String) {
@@ -239,13 +251,19 @@ extension SpeechCenter {
                 sessionID: sessionID,
                 name: request["session_name"] as? String ?? "",
                 cwd: request["cwd"] as? String,
+                root: request["root"] as? String,
                 text: text,
                 date: timestamp.map(Date.init(timeIntervalSince1970:)) ?? .now
             )
             return ["ok": true]
         case "focus":
-            guard let sessionID = request["session_id"] as? String, !sessionID.isEmpty else { return failure("Focus needs a session_id.") }
-            focus(sessionID: sessionID)
+            if let sessionID = request["session_id"] as? String, !sessionID.isEmpty {
+                setFocus(.session(sessionID))
+            } else if let folder = request["root"] as? String, !folder.isEmpty {
+                setFocus(.folder(folder))
+            } else {
+                return failure("Focus needs a session_id or a root.")
+            }
             return ["ok": true]
         case "main":
             if request["off"] as? Bool == true {

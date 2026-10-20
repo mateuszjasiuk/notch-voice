@@ -27,8 +27,8 @@ The `type` field says what the request is:
 | `type` | Other fields | What the app does |
 | --- | --- | --- |
 | `permission`, or no `type` | `tool_name`, `tool_input`, `cwd`, `session_id` | Shows the request in the notch. It answers `{"decision": "allow"}`, `"deny"` or `"ask"` once you click, and keeps the connection open until then. |
-| `reply` | `session_id`, `session_name`, `cwd`, `text`, `timestamp` (seconds since 1970) | Saves the reply in the session's history, then reads it or announces it, depending on the **New replies** setting. By default, replies from the session in focus are read, and the others are announced. A reply never interrupts the one being read. |
-| `focus` | `session_id` | Marks the session the user last wrote to. `notchvoice_brief.py` sends this with every prompt the user writes. |
+| `reply` | `session_id`, `session_name`, `cwd`, `root` (the git worktree, or `cwd` outside git), `text`, `timestamp` (seconds since 1970) | Saves the reply in the session's history, then reads it or announces it, depending on the **New replies** setting. By default, replies from the session in focus are read, and the others are announced. A reply never interrupts the one being read. |
+| `focus` | `session_id` or `root` | Marks what the user is working in: a session, which `notchvoice_brief.py` sends with every prompt the user writes, or a worktree, which `nv focus` sends from an editor. The latest one wins. |
 | `main` | `session_id` or `session`, or `off: true` | Makes a session the main one. While there is a main session, it counts as the session in focus, whatever the user last wrote to. |
 | `say` | `text` | Reads the text straight away. |
 | `list` | | Answers with `sessions`, each with `id`, `name`, `cwd`, `unread`, `replies`, `muted` and `last_activity`, plus `mode`, `speaking` and `waiting`. |

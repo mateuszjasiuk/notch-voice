@@ -154,6 +154,7 @@ class SpeakToAppTests(unittest.TestCase):
         self.assertEqual(message["session_id"], "abc")
         self.assertEqual(message["text"], "Hello")
         self.assertEqual(message["cwd"], self.folder)
+        self.assertEqual(message["root"], self.folder)
         self.assertIsInstance(message["timestamp"], float)
 
     def test_without_the_app_nothing_is_sent(self):
@@ -202,6 +203,17 @@ class NvTests(unittest.TestCase):
             os.environ.pop("CLAUDE_CODE_SESSION_ID", None)
             with self.assertRaises(nv.UsageError):
                 nv.request_for("main", [])
+
+    def test_focus_sends_the_worktree_of_a_folder_so_subfolders_match(self):
+        with tempfile.TemporaryDirectory() as folder:
+            project = os.path.realpath(os.path.join(folder, "worktree-a"))
+            os.makedirs(os.path.join(project, "apps"))
+            subprocess.run(["git", "init", "-q", project], check=True)
+            self.assertEqual(nv.request_for("focus", [os.path.join(project, "apps")]), {"type": "focus", "root": project})
+            outside = os.path.realpath(folder)
+            self.assertEqual(nv.request_for("focus", [outside]), {"type": "focus", "root": outside})
+            # speak.py sends the same root with each reply, so the two meet in the app.
+            self.assertEqual(speak.worktree_root(os.path.join(project, "apps")), project)
 
     def test_say_reads_standard_input_without_text(self):
         self.assertEqual(nv.request_for("say", ["-"], stdin=io.StringIO("from a pipe\n")), {"type": "say", "text": "from a pipe"})

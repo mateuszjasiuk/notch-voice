@@ -103,6 +103,10 @@ def git(cwd, *args):
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
+def worktree_root(cwd):
+    return (git(cwd, "rev-parse", "--show-toplevel") or os.path.normpath(cwd)) if cwd else None
+
+
 def session_name(cwd):
     name = os.environ.get("NOTCHVOICE_SESSION_NAME", "").strip()
     if name or not cwd:
@@ -111,7 +115,7 @@ def session_name(cwd):
     branch = git(cwd, "symbolic-ref", "--short", "-q", "HEAD")
     if branch:
         return branch
-    return os.path.basename(git(cwd, "rev-parse", "--show-toplevel") or os.path.normpath(cwd))
+    return os.path.basename(worktree_root(cwd))
 
 
 def send_to_app(payload, text):
@@ -122,6 +126,8 @@ def send_to_app(payload, text):
         "session_id": payload.get("session_id") or DESKTOP_SESSION[0],
         "session_name": session_name(cwd),
         "cwd": cwd,
+        # nv focus matches sessions by worktree, so a session working in a subfolder still counts.
+        "root": worktree_root(cwd),
         "text": text,
         "timestamp": time.time(),
     }

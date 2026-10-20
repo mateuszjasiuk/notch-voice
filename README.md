@@ -86,10 +86,23 @@ nv skip                 # go on to the next reply in the queue
 nv stop                 # stop reading and empty the queue
 nv mute web             # stop reading a session's replies (nv unmute web turns them back on)
 nv main api             # make api the main session (nv main off goes back to the last session you wrote to)
+nv focus                # treat the session in this folder's worktree as the one you're working in
 nv say "Hello"          # read any text
 ```
 
 A session can be given by the start of its name, or of any word in it, as long as only one session matches. For example, `nv read multi` finds `feature/multi-session-speech`. Replies you ask for play straight away, even while voice replies are switched off. The history lives in the app, so it starts empty each time the app opens.
+
+### Follow your editor
+
+Writing a prompt tells NotchVoice which session you're working in, but just looking at another worktree doesn't. If you keep an editor open in each worktree, it can tell NotchVoice whenever you switch to it, with `nv focus`. In Neovim, add this to your config:
+
+```lua
+vim.api.nvim_create_autocmd({ "VimEnter", "FocusGained" }, {
+  callback = function() vim.system({ "nv", "focus", vim.fn.getcwd() }) end,
+})
+```
+
+Neovim gets `FocusGained` from terminals that report focus, which kitty, iTerm2, WezTerm and Ghostty do. Switching to the editor counts like writing a prompt, so whichever you did last wins. A main session chosen with `/main` wins over both.
 
 ### Ask Claude to read something: `/read`
 
