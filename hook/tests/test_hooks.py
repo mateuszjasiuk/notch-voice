@@ -323,6 +323,14 @@ class BriefTests(unittest.TestCase):
             thread.join()
         self.assertEqual(received, [{"type": "focus", "session_id": "abc"}])
 
+    def test_a_background_task_waking_the_session_does_not_move_the_focus(self):
+        prompt = "<task-notification>\n<task-id>b1</task-id>\n<status>completed</status>\n</task-notification>"
+        with mock.patch.object(brief, "tell_app_focus") as tell:
+            self.assertIn("read aloud", run_main(brief, {"session_id": "abc", "prompt": prompt}))
+            tell.assert_not_called()
+            run_main(brief, {"session_id": "abc", "prompt": "what about <task-notification>?"})
+            tell.assert_called_once_with("abc")
+
     def test_without_the_app_the_prompt_goes_through_quickly(self):
         started = time.monotonic()
         self.assertIn("read aloud", run_main(brief, {"session_id": "abc", "prompt": "hello"}))

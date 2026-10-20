@@ -35,6 +35,9 @@ def user_temp_dir():
 
 SPOKEN_DIR = os.path.join(user_temp_dir(), "notchvoice-spoken")
 SOCKET = os.path.join(user_temp_dir(), "notchvoice.sock")
+# Claude Code wakes a session with these when a background task ends. The user didn't write them, so they don't
+# move the focus to that session.
+AUTOMATED_PROMPTS = ("<task-notification>",)
 
 
 def tell_app_focus(session_id):
@@ -72,7 +75,9 @@ def main():
         payload = {}
     if isinstance(payload, dict) and isinstance(payload.get("session_id"), str):
         clear_spoken_marker(payload["session_id"])
-        tell_app_focus(payload["session_id"])
+        prompt = payload.get("prompt")
+        if not (isinstance(prompt, str) and prompt.lstrip().startswith(AUTOMATED_PROMPTS)):
+            tell_app_focus(payload["session_id"])
     if os.path.exists(MUTE_FILE) or not wants_short_replies():
         return
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": REMINDER}}))
