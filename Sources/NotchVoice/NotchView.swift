@@ -19,6 +19,8 @@ struct NotchRootView: View {
             theme: preferences.theme,
             prompt: state.prompt,
             pendingCount: state.pendingCount,
+            hasSessions: state.hasSessions,
+            speech: speech,
             setEnabled: voice.setEnabled,
             answer: answer,
             openSettings: openSettings
@@ -35,13 +37,15 @@ struct NotchView: View {
     let theme: GlowTheme
     let prompt: PermissionPrompt?
     let pendingCount: Int
+    let hasSessions: Bool
+    let speech: SpeechCenter
     let setEnabled: @MainActor (Bool) -> Void
     let answer: @MainActor (UUID, PermissionResponse) -> Void
     let openSettings: @MainActor () -> Void
 
     var body: some View {
         let isExpanded = isOpen || prompt != nil
-        let size = prompt != nil ? metrics.permissionSize : isOpen ? metrics.openSize : metrics.closedSize
+        let size = prompt != nil ? metrics.permissionSize : isOpen ? metrics.openSize(hasSessions: hasSessions) : metrics.closedSize
         let topRadius = isExpanded ? NotchMetrics.openTopRadius : NotchMetrics.closedTopRadius
         let bottomRadius = isExpanded ? NotchMetrics.openBottomRadius : NotchMetrics.closedBottomRadius
         let showsBody = isExpanded || isGlowing
@@ -66,13 +70,19 @@ struct NotchView: View {
                         removal: .opacity.animation(.easeIn(duration: 0.1))
                     ))
             } else if isOpen {
-                VoicePanel(
-                    isEnabled: isEnabled,
-                    isSpeaking: isSpeaking,
-                    accent: theme.accent,
-                    setEnabled: setEnabled,
-                    openSettings: openSettings
-                )
+                VStack(spacing: 0) {
+                    VoicePanel(
+                        isEnabled: isEnabled,
+                        isSpeaking: isSpeaking,
+                        accent: theme.accent,
+                        setEnabled: setEnabled,
+                        openSettings: openSettings
+                    )
+                    .frame(height: metrics.openSize.height - metrics.notch.height)
+                    if hasSessions {
+                        SessionsPanel(speech: speech, accent: theme.accent)
+                    }
+                }
                 .padding(.top, metrics.notch.height)
                 .transition(.asymmetric(
                     insertion: .opacity.animation(.easeOut(duration: 0.2).delay(0.12)),

@@ -96,6 +96,10 @@ final class SpeechCenter: ObservableObject {
         interrupt(with: utterance(for: reply, in: session, requested: true))
     }
 
+    func playParagraph(_ text: String, in session: Session) {
+        interrupt(with: Utterance(text: text, label: session.name, sessionID: session.id, isRequested: true))
+    }
+
     @discardableResult
     func playNextUnread() -> Bool {
         guard let (session, reply) = sessions.oldestUnread() else { return false }

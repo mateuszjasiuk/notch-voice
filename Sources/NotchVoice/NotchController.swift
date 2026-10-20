@@ -14,8 +14,19 @@ struct NotchMetrics: Equatable {
 
     var closedSize: CGSize { CGSize(width: notch.width + 2 * Self.closedTopRadius, height: notch.height) }
     var openSize: CGSize { CGSize(width: max(360, notch.width + 170), height: notch.height + 58) }
+    var sessionsSize: CGSize { CGSize(width: max(460, notch.width + 270), height: notch.height + 58 + 280) }
     var permissionSize: CGSize { CGSize(width: max(440, notch.width + 250), height: notch.height + 152) }
-    var windowSize: CGSize { CGSize(width: permissionSize.width + 2 * Self.glowMargin, height: permissionSize.height + Self.glowMargin) }
+    var windowSize: CGSize {
+        CGSize(
+            width: max(permissionSize.width, sessionsSize.width) + 2 * Self.glowMargin,
+            height: max(permissionSize.height, sessionsSize.height) + Self.glowMargin
+        )
+    }
+
+    // Once a session has replied, the open notch also lists the sessions.
+    func openSize(hasSessions: Bool) -> CGSize {
+        hasSessions ? sessionsSize : openSize
+    }
 
     @MainActor
     static func target() -> (screen: NSScreen, metrics: NotchMetrics)? {
@@ -37,6 +48,7 @@ final class NotchState: ObservableObject {
     @Published var isPreviewingGlow = false
     @Published var prompt: PermissionPrompt?
     @Published var pendingCount = 0
+    @Published var hasSessions = false
     @Published var metrics = NotchMetrics(notch: CGSize(width: 185, height: 32), hasNotch: false)
 }
 
@@ -54,6 +66,7 @@ final class NotchController {
     private var isMenuOpen = false
     private var themeChanges: AnyCancellable?
     private var permissionChanges: AnyCancellable?
+    private var sessionChanges: AnyCancellable?
     private var glowPreview = 0
 
     init(voice: VoiceController, speech: SpeechCenter, preferences: Preferences, permissions: PermissionCenter, openSettings: @escaping @MainActor () -> Void) {
@@ -69,6 +82,11 @@ final class NotchController {
         }
         themeChanges = preferences.$theme.dropFirst().removeDuplicates().sink { [weak self] _ in
             MainActor.assumeIsolated { self?.previewGlow() }
+        }
+        sessionChanges = speech.$sessions.map { !$0.sessions.isEmpty }.removeDuplicates().sink { [weak self] hasSessions in
+            MainActor.assumeIsolated {
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.8)) { self?.state.hasSessions = hasSessions }
+            }
         }
         permissionChanges = permissions.$queue.sink { [weak self] queue in
             MainActor.assumeIsolated { self?.showPermission(queue.first, count: queue.count) }
@@ -108,7 +126,7 @@ final class NotchController {
     }
 
     private var panelZone: CGRect {
-        let size = state.metrics.openSize
+        let size = state.metrics.openSize(hasSessions: state.hasSessions)
         return CGRect(x: screenFrame.midX - size.width / 2, y: screenFrame.maxY - size.height, width: size.width, height: size.height + 8)
     }
 
