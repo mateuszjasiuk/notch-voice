@@ -68,6 +68,26 @@ To set it, open settings, click **Record** next to **Mute shortcut**, and press 
   <img src="docs/shortcut-settings.png" alt="The Mute shortcut row in NotchVoice settings, set to Option-Command-M" width="470">
 </p>
 
+## Several sessions and the `nv` command
+
+When several Claude Code sessions finish at once, their replies wait their turn. Each one starts with the session's name, for example "Response from feat api". The name is the session's git branch, or its folder. To choose it yourself, start Claude Code with `NOTCHVOICE_SESSION_NAME` set.
+
+The app keeps the last 20 replies of each session, so you can hear them again with the `nv` command:
+
+```bash
+nv list                 # sessions, with how many replies you haven't heard
+nv read                 # read the latest reply again
+nv read api 1           # the reply before the latest one, from the session whose name starts with "api"
+nv history api          # print the session's recent replies
+nv next                 # read the oldest reply you haven't heard
+nv skip                 # go on to the next reply in the queue
+nv stop                 # stop reading and empty the queue
+nv mute web             # stop reading a session's replies (nv unmute web turns them back on)
+nv say "Hello"          # read any text
+```
+
+A session can be given by the start of its name, as long as only one session matches. Replies you ask for play straight away, even while voice replies are switched off. The history lives in the app, so it starts empty each time the app opens.
+
 ## Regular Claude chats
 
 Chats in the Claude desktop app can be read aloud too. The installer adds a small local tool called `speak` to the desktop app, and NotchVoice asks Claude to call it at the end of each reply with a short spoken summary. It uses the same voice, glow, music ducking and mute switch as Claude Code.
@@ -116,13 +136,14 @@ NotchVoice works wherever Claude Code runs on your Mac: in the terminal, in the 
 > [!TIP]
 > The first time Claude speaks while Spotify or Music is open, macOS asks whether it may control that app. Allow it, so the music can get quieter.
 
-The installer does five things:
+The installer does six things:
 
-1. It copies three hooks to `~/.claude/hooks/`: `speak.py` for voice replies, `notchvoice_permission.py` for permission requests, and `notchvoice_brief.py` for short spoken replies. The speak tool for desktop chats, `notchvoice_mcp.py`, goes there too. An existing file with the same name is saved with a `.bak` extension first.
-2. It adds the hooks to `~/.claude/settings.json` as `Stop`, `PermissionRequest` and `UserPromptSubmit` hooks, and keeps a backup of that file. It also denies the desktop speak tool there, so Claude Code doesn't read its replies twice.
-3. It builds the app on your Mac and puts it in `~/Applications`. Because the app is built locally, macOS doesn't show a security warning.
-4. It starts the app, which then opens at login.
-5. If the Claude desktop app is installed, it adds the speak tool to the app's `claude_desktop_config.json` and keeps a backup of that file. The desktop app rewrites that file while it's open, so if it's open, the installer makes the change again as soon as you quit it.
+1. It copies three hooks to `~/.claude/hooks/`: `speak.py` for voice replies, `notchvoice_permission.py` for permission requests, and `notchvoice_brief.py` for short spoken replies. The speak tool for desktop chats, `notchvoice_mcp.py`, and the `nv` command, `nv.py`, go there too. An existing file with the same name is saved with a `.bak` extension first.
+2. It links `~/.local/bin/nv` to `nv.py`, unless a different `nv` is already there.
+3. It adds the hooks to `~/.claude/settings.json` as `Stop`, `PermissionRequest` and `UserPromptSubmit` hooks, and keeps a backup of that file. It also denies the desktop speak tool there, so Claude Code doesn't read its replies twice.
+4. It builds the app on your Mac and puts it in `~/Applications`. Because the app is built locally, macOS doesn't show a security warning.
+5. It starts the app, which then opens at login.
+6. If the Claude desktop app is installed, it adds the speak tool to the app's `claude_desktop_config.json` and keeps a backup of that file. The desktop app rewrites that file while it's open, so if it's open, the installer makes the change again as soon as you quit it.
 
 On a Mac without a notch, the panel sits at the top center of the screen instead.
 
@@ -177,7 +198,7 @@ The settings window covers everything you need day to day. If you use the hook w
 ./install.sh --uninstall
 ```
 
-This removes the app, its login item, the hooks, the speak tool, and their entries in `settings.json` and the desktop app's config.
+This removes the app, its login item, the hooks, the speak tool, the `nv` command, and their entries in `settings.json` and the desktop app's config.
 
 ## Troubleshooting
 

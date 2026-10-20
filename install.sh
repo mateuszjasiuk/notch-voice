@@ -6,6 +6,7 @@ cd "$(dirname "$0")"
 HOOKS="$HOME/.claude/hooks"
 SETTINGS="$HOME/.claude/settings.json"
 APP="$HOME/Applications/NotchVoice.app"
+BIN="$HOME/.local/bin"
 
 if [[ "${1:-}" == "--uninstall" ]]; then
   pkill -x NotchVoice || true
@@ -44,7 +45,10 @@ if os.path.exists(path):
         json.dump(settings, f, indent=2)
         f.write("\n")
 EOF
-  rm -f "$HOOKS/speak.py" "$HOOKS/notchvoice_permission.py" "$HOOKS/notchvoice_brief.py" "$HOOKS/notchvoice_mcp.py" "$HOME/.claude/tts_off" "$HOME/.claude/tts_settings.json"
+  if [[ "$(readlink "$BIN/nv" 2>/dev/null)" == "$HOOKS/nv.py" ]]; then
+    rm -f "$BIN/nv"
+  fi
+  rm -f "$HOOKS/speak.py" "$HOOKS/notchvoice_permission.py" "$HOOKS/notchvoice_brief.py" "$HOOKS/notchvoice_mcp.py" "$HOOKS/nv.py" "$HOME/.claude/tts_off" "$HOME/.claude/tts_settings.json"
   python3 hook/notchvoice_desktop.py
   echo "NotchVoice and its hooks are removed. Restart Claude Code."
   exit 0
@@ -56,7 +60,7 @@ if ! command -v swift >/dev/null 2>&1; then
 fi
 
 mkdir -p "$HOOKS"
-for script in speak.py notchvoice_permission.py notchvoice_brief.py notchvoice_mcp.py; do
+for script in speak.py notchvoice_permission.py notchvoice_brief.py notchvoice_mcp.py nv.py; do
   if [[ -f "$HOOKS/$script" ]] && ! cmp -s "hook/$script" "$HOOKS/$script"; then
     cp "$HOOKS/$script" "$HOOKS/$script.bak"
     echo "Saved your previous $script as $HOOKS/$script.bak"
@@ -64,6 +68,18 @@ for script in speak.py notchvoice_permission.py notchvoice_brief.py notchvoice_m
   cp "hook/$script" "$HOOKS/$script"
   chmod +x "$HOOKS/$script"
 done
+
+# The nv command. Another program called nv is left alone.
+mkdir -p "$BIN"
+if [[ -e "$BIN/nv" || -L "$BIN/nv" ]] && [[ "$(readlink "$BIN/nv")" != "$HOOKS/nv.py" ]]; then
+  echo "Skipped the nv command: $BIN/nv already exists. Run python3 $HOOKS/nv.py instead."
+else
+  ln -sf "$HOOKS/nv.py" "$BIN/nv"
+  case ":$PATH:" in
+    *":$BIN:"*) ;;
+    *) echo "Added the nv command to $BIN, which isn't on your PATH. Add it to use nv in the terminal." ;;
+  esac
+fi
 
 python3 - "$SETTINGS" <<'EOF'
 import json, os, shutil, sys

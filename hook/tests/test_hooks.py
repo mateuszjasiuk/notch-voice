@@ -28,6 +28,7 @@ brief = load("notchvoice_brief")
 permission = load("notchvoice_permission")
 mcp = load("notchvoice_mcp")
 desktop = load("notchvoice_desktop")
+nv = load("nv")
 
 
 def run_main(module, payload):
@@ -173,6 +174,82 @@ class SpeakToAppTests(unittest.TestCase):
             run_main(speak, {"session_id": "abc", "last_assistant_message": "Done."})
         send.assert_called_once()
         popen.assert_not_called()
+
+
+class NvTests(unittest.TestCase):
+    def run_nv(self, *argv, answer=None):
+        output, errors = io.StringIO(), io.StringIO()
+        with mock.patch.object(nv, "send", return_value=answer) as send, redirect_stdout(output), mock.patch.object(sys, "stderr", errors):
+            code = nv.main(list(argv))
+        return code, output.getvalue(), errors.getvalue(), send
+
+    def test_commands_become_requests(self):
+        self.assertEqual(nv.request_for("list", []), {"type": "list"})
+        self.assertEqual(nv.request_for("read", []), {"type": "read", "session": "", "back": 0})
+        self.assertEqual(nv.request_for("read", ["api"]), {"type": "read", "session": "api", "back": 0})
+        self.assertEqual(nv.request_for("read", ["api", "2"]), {"type": "read", "session": "api", "back": 2})
+        self.assertEqual(nv.request_for("read", ["1"]), {"type": "read", "session": "", "back": 1})
+        self.assertEqual(nv.request_for("history", ["api", "3"]), {"type": "history", "session": "api", "count": 3})
+        self.assertEqual(nv.request_for("mute", ["web"]), {"type": "mute", "session": "web"})
+        self.assertEqual(nv.request_for("say", ["hello", "there"]), {"type": "say", "text": "hello there"})
+
+    def test_say_reads_standard_input_without_text(self):
+        self.assertEqual(nv.request_for("say", ["-"], stdin=io.StringIO("from a pipe\n")), {"type": "say", "text": "from a pipe"})
+        self.assertEqual(nv.request_for("say", [], stdin=io.StringIO("piped")), {"type": "say", "text": "piped"})
+
+    def test_mistakes_are_explained_and_nothing_is_sent(self):
+        for argv in (["mute"], ["read", "api", "x"], ["skip", "now"], ["dance"]):
+            code, _, errors, send = self.run_nv(*argv)
+            self.assertEqual(code, 2)
+            self.assertIn("nv --help", errors)
+            send.assert_not_called()
+
+    def test_errors_from_the_app_are_shown(self):
+        code, _, errors, _ = self.run_nv("read", "x", answer={"ok": False, "error": 'No session matches "x".'})
+        self.assertEqual(code, 1)
+        self.assertIn('No session matches "x".', errors)
+
+    def test_without_the_app_say_still_speaks(self):
+        with mock.patch.object(nv.subprocess, "run") as run:
+            code, _, _, _ = self.run_nv("say", "hello")
+        self.assertEqual(code, 0)
+        self.assertEqual(run.call_args.kwargs["input"], "hello")
+        code, _, errors, _ = self.run_nv("list")
+        self.assertEqual(code, 1)
+        self.assertIn("isn't running", errors)
+
+    def test_list_shows_unread_counts_and_what_is_being_read(self):
+        answer = {"ok": True, "speaking": "api", "waiting": 1, "sessions": [
+            {"name": "api", "unread": 2, "muted": False, "cwd": os.path.expanduser("~/work/api")},
+            {"name": "web-frontend", "unread": 0, "muted": True, "cwd": "/srv/web"},
+        ]}
+        _, output, _, _ = self.run_nv("list", answer=answer)
+        lines = output.splitlines()
+        self.assertTrue(lines[0].startswith("api           2 unread"))
+        self.assertIn("~/work/api", lines[0])
+        self.assertIn("muted", lines[1])
+        self.assertIn("Reading api, 1 waiting", output)
+
+    def test_history_prints_each_reply_with_its_number(self):
+        answer = {"ok": True, "session": {"name": "api"}, "replies": [
+            {"index": 0, "text": "Latest.", "date": "2026-10-20T10:00:00Z", "read": False},
+            {"index": 1, "text": "Earlier.", "date": "2026-10-20T09:00:00Z", "read": True},
+        ]}
+        _, output, _, _ = self.run_nv("history", "api", answer=answer)
+        self.assertIn("[0] 2026-10-20T10:00:00Z  (unread)\nLatest.", output)
+        self.assertIn("[1] 2026-10-20T09:00:00Z\nEarlier.", output)
+        _, output, _, _ = self.run_nv("history", "api", "--json", answer=answer)
+        self.assertEqual(json.loads(output), answer)
+
+    def test_talks_to_the_app_over_its_socket(self):
+        with tempfile.TemporaryDirectory(dir="/tmp") as folder:
+            path = os.path.join(folder, "notch.sock")
+            thread, received = fake_app(path, b'{"ok":true,"session":"api"}\n')
+            with mock.patch.object(nv, "SOCKET", path):
+                answer = nv.send({"type": "read", "session": "api", "back": 0})
+            thread.join()
+        self.assertEqual(received, [{"type": "read", "session": "api", "back": 0}])
+        self.assertEqual(answer, {"ok": True, "session": "api"})
 
 
 class BriefTests(unittest.TestCase):

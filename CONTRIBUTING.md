@@ -10,6 +10,7 @@ Thanks for helping out. NotchVoice is a small project, so focused pull requests 
   - `notchvoice_permission.py` is the `PermissionRequest` hook. It sends permission requests to the notch.
   - `notchvoice_brief.py` is the `UserPromptSubmit` hook. It asks Claude to keep spoken replies short.
 - **`hook/notchvoice_mcp.py`** is a small MCP server for chats in the Claude desktop app. Its `speak` tool runs `speak.py` with the text Claude passes in.
+- **`hook/nv.py`** is the `nv` command. It sends requests to the app over the socket and prints the answers.
 - **`hook/notchvoice_desktop.py`** adds that server to the desktop app's config for `install.sh`, or removes it. The desktop app rewrites its config while it's open, so when it's open the script makes the change again after the app quits.
 - **`Tests/`** and **`hook/tests/`** hold the tests for the app and the hooks.
 
