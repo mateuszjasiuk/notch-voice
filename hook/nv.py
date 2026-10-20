@@ -8,6 +8,8 @@
   nv skip                      go on to the next reply in the queue
   nv stop                      stop reading and empty the queue
   nv mute <session>            stop reading a session's replies; nv unmute <session> turns them back on
+  nv main [session]            make a session the main one: its replies are read, the others only announced.
+                               Inside Claude Code, without a session, it's that session. nv main off undoes it.
   nv say <text>                read any text; with no text, or "-", it reads standard input
 
 A session is its name, or the start of it. Without one, nv uses the session that replied most recently.
@@ -21,7 +23,7 @@ import sys
 import tempfile
 
 DARWIN_USER_TEMP_DIR = 65537  # _CS_DARWIN_USER_TEMP_DIR in <unistd.h>
-COMMANDS = ("list", "read", "history", "next", "skip", "stop", "mute", "unmute", "say")
+COMMANDS = ("list", "read", "history", "next", "skip", "stop", "mute", "unmute", "main", "say")
 
 
 def user_temp_dir():
@@ -69,6 +71,17 @@ def request_for(command, args, stdin=sys.stdin):
         if len(args) != 1:
             raise UsageError(f"nv {command} needs a session.")
         return {"type": command, "session": args[0]}
+    if command == "main":
+        if len(args) > 1:
+            raise UsageError("nv main takes one session at most.")
+        if args == ["off"]:
+            return {"type": "main", "off": True}
+        if args:
+            return {"type": "main", "session": args[0]}
+        session_id = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
+        if not session_id:
+            raise UsageError("Outside Claude Code, say which session: nv main <session>.")
+        return {"type": "main", "session_id": session_id}
     if command == "say":
         text = " ".join(args) if args and args != ["-"] else stdin.read()
         if not text.strip():
@@ -116,8 +129,8 @@ def describe_sessions(answer):
         cwd = session.get("cwd") or ""
         cwd = "~" + cwd[len(home):] if cwd.startswith(home + "/") else cwd
         unread = f"{session['unread']} unread" if session["unread"] else ""
-        muted = "muted" if session.get("muted") else ""
-        lines.append("  ".join(part for part in (session["name"].ljust(width), unread.ljust(9), muted.ljust(5), cwd) if part).rstrip())
+        flags = "main" if session.get("main") else "muted" if session.get("muted") else ""
+        lines.append("  ".join(part for part in (session["name"].ljust(width), unread.ljust(9), flags.ljust(5), cwd) if part).rstrip())
     if answer.get("speaking"):
         waiting = answer.get("waiting") or 0
         lines.append(f"\nReading {answer['speaking']}" + (f", {waiting} waiting" if waiting else ""))
@@ -169,6 +182,8 @@ def main(argv=None):
         print(f"Reading {answer.get('session')}.")
     elif command in ("mute", "unmute"):
         print(f"{answer.get('session')} is {command}d.")
+    elif command == "main":
+        print("No main session now." if request.get("off") else f"{answer.get('session')} is the main session.")
     return 0
 
 

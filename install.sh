@@ -49,9 +49,11 @@ EOF
   if [[ "$(readlink "$BIN/nv" 2>/dev/null)" == "$HOOKS/nv.py" ]]; then
     rm -f "$BIN/nv"
   fi
-  if grep -qs "Installed by NotchVoice" "$COMMANDS/read.md"; then
-    rm -f "$COMMANDS/read.md"
-  fi
+  for command in read.md main.md; do
+    if grep -qs "Installed by NotchVoice" "$COMMANDS/$command"; then
+      rm -f "$COMMANDS/$command"
+    fi
+  done
   rm -f "$HOOKS/speak.py" "$HOOKS/notchvoice_permission.py" "$HOOKS/notchvoice_brief.py" "$HOOKS/notchvoice_mcp.py" "$HOOKS/nv.py" "$HOME/.claude/tts_off" "$HOME/.claude/tts_settings.json"
   python3 hook/notchvoice_desktop.py
   echo "NotchVoice and its hooks are removed. Restart Claude Code."
@@ -73,13 +75,15 @@ for script in speak.py notchvoice_permission.py notchvoice_brief.py notchvoice_m
   chmod +x "$HOOKS/$script"
 done
 
-# The /read command for Claude Code.
+# The /read and /main commands for Claude Code.
 mkdir -p "$COMMANDS"
-if [[ -f "$COMMANDS/read.md" ]] && ! cmp -s commands/read.md "$COMMANDS/read.md"; then
-  cp "$COMMANDS/read.md" "$COMMANDS/read.md.bak"
-  echo "Saved your previous /read command as $COMMANDS/read.md.bak"
-fi
-cp commands/read.md "$COMMANDS/read.md"
+for command in read.md main.md; do
+  if [[ -f "$COMMANDS/$command" ]] && ! cmp -s "commands/$command" "$COMMANDS/$command"; then
+    cp "$COMMANDS/$command" "$COMMANDS/$command.bak"
+    echo "Saved your previous /${command%.md} command as $COMMANDS/$command.bak"
+  fi
+  cp "commands/$command" "$COMMANDS/$command"
+done
 
 # The nv command. Another program called nv is left alone.
 mkdir -p "$BIN"

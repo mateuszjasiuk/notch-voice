@@ -60,6 +60,8 @@ final class SpeechCenter: ObservableObject {
     var mode: () -> ReadingMode = { .focusedSession }
     // The session the user last wrote a prompt to, from notchvoice_brief.py.
     private(set) var focusedSessionID: String?
+    // The session the user chose as main, with /main, nv main or the star in the notch. It wins over the last prompt.
+    @Published private(set) var mainSessionID: String?
 
     private let voice: VoiceController
     private let ducker = MusicDucker()
@@ -97,10 +99,15 @@ final class SpeechCenter: ObservableObject {
         focusedSessionID = sessionID
     }
 
+    func setMain(sessionID: String?) {
+        mainSessionID = sessionID
+    }
+
     // Before the first prompt there is nothing to go on, so every session counts. Desktop chats have no prompt hook,
     // and their speak tool is only called in the chat the user is looking at.
     private func isFocused(_ session: Session) -> Bool {
-        focusedSessionID == nil || session.id == focusedSessionID || session.id == "claude-desktop"
+        guard let focused = mainSessionID ?? focusedSessionID else { return true }
+        return session.id == focused || session.id == "claude-desktop"
     }
 
     func say(_ text: String) {
@@ -240,6 +247,21 @@ extension SpeechCenter {
             guard let sessionID = request["session_id"] as? String, !sessionID.isEmpty else { return failure("Focus needs a session_id.") }
             focus(sessionID: sessionID)
             return ["ok": true]
+        case "main":
+            if request["off"] as? Bool == true {
+                setMain(sessionID: nil)
+                return ["ok": true]
+            }
+            // A session that hasn't replied yet can still be made main, by its id.
+            if let sessionID = request["session_id"] as? String, !sessionID.isEmpty {
+                setMain(sessionID: sessionID)
+                return ["ok": true, "session": sessions.session(id: sessionID)?.name ?? "this session"]
+            }
+            guard let query = request["session"] as? String, !query.isEmpty else { return failure("Say which session to make main.") }
+            return withSession(request) { session in
+                setMain(sessionID: session.id)
+                return ["ok": true, "session": session.name]
+            }
         case "say":
             guard let text = request["text"] as? String, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 return failure("There was nothing to say.")
@@ -311,6 +333,7 @@ extension SpeechCenter {
             "unread": session.unreadCount,
             "replies": session.replies.count,
             "muted": session.isMuted,
+            "main": session.id == mainSessionID,
             "last_activity": session.lastActivity.ISO8601Format(),
         ]
     }

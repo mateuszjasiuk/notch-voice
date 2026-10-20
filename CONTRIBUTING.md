@@ -12,6 +12,7 @@ Thanks for helping out. NotchVoice is a small project, so focused pull requests 
 - **`hook/notchvoice_mcp.py`** is a small MCP server for chats in the Claude desktop app. Its `speak` tool runs `speak.py` with the text Claude passes in.
 - **`hook/nv.py`** is the `nv` command. It sends requests to the app over the socket and prints the answers.
 - **`commands/read.md`** is the `/read` command for Claude Code. It tells Claude to find the passage the user asked for and read it with `nv say`.
+- **`commands/main.md`** is the `/main` command. It runs `nv main`, which makes the session the main one.
 - **`hook/notchvoice_desktop.py`** adds that server to the desktop app's config for `install.sh`, or removes it. The desktop app rewrites its config while it's open, so when it's open the script makes the change again after the app quits.
 - **`Tests/`** and **`hook/tests/`** hold the tests for the app and the hooks.
 
@@ -27,7 +28,8 @@ The `type` field says what the request is:
 | --- | --- | --- |
 | `permission`, or no `type` | `tool_name`, `tool_input`, `cwd`, `session_id` | Shows the request in the notch. It answers `{"decision": "allow"}`, `"deny"` or `"ask"` once you click, and keeps the connection open until then. |
 | `reply` | `session_id`, `session_name`, `cwd`, `text`, `timestamp` (seconds since 1970) | Saves the reply in the session's history, then reads it or announces it, depending on the **New replies** setting. By default, replies from the session in focus are read, and the others are announced. A reply never interrupts the one being read. |
-| `focus` | `session_id` | Marks the session the user is working in. `notchvoice_brief.py` sends this with every prompt. |
+| `focus` | `session_id` | Marks the session the user last wrote to. `notchvoice_brief.py` sends this with every prompt the user writes. |
+| `main` | `session_id` or `session`, or `off: true` | Makes a session the main one. While there is a main session, it counts as the session in focus, whatever the user last wrote to. |
 | `say` | `text` | Reads the text straight away. |
 | `list` | | Answers with `sessions`, each with `id`, `name`, `cwd`, `unread`, `replies`, `muted` and `last_activity`, plus `mode`, `speaking` and `waiting`. |
 | `history` | `session`, `count` | Answers with `replies`, latest first. Each has `index` (0 is the latest), `text`, `date` and `read`. |

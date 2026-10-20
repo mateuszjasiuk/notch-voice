@@ -70,7 +70,7 @@ To set it, open settings, click **Record** next to **Mute shortcut**, and press 
 
 ## Several sessions and the `nv` command
 
-When several Claude Code sessions finish at once, their replies wait their turn instead of cutting each other off. Replies from the session you're working in, the one you last wrote to, are read aloud. The other sessions only say "New response from" and their name, and you can play their replies when you're ready. To have every reply read, choose **Read them all aloud** under **New replies** in settings.
+When several Claude Code sessions finish at once, their replies wait their turn instead of cutting each other off. Replies from the session you're working in are read aloud. That's your main session if you've chosen one, or else the session you last wrote to. To choose it, type `/main` in that session, or click the star next to it in the notch. The other sessions only say "New response from" and their name, and you can play their replies when you're ready. To have every reply read, choose **Read them all aloud** under **New replies** in settings.
 
 A session's name is its git branch, or its folder. Only a short form of the name is read aloud: the part after the last slash, without a ticket number in front, and at most three words. For example, `sch-605-horesta-spec-gaps` is read as "horesta spec gaps". To choose the name yourself, start Claude Code with `NOTCHVOICE_SESSION_NAME` set.
 
@@ -85,6 +85,7 @@ nv next                 # read the oldest reply you haven't heard
 nv skip                 # go on to the next reply in the queue
 nv stop                 # stop reading and empty the queue
 nv mute web             # stop reading a session's replies (nv unmute web turns them back on)
+nv main api             # make api the main session (nv main off goes back to the last session you wrote to)
 nv say "Hello"          # read any text
 ```
 
@@ -152,7 +153,7 @@ NotchVoice works wherever Claude Code runs on your Mac: in the terminal, in the 
 The installer does six things:
 
 1. It copies three hooks to `~/.claude/hooks/`: `speak.py` for voice replies, `notchvoice_permission.py` for permission requests, and `notchvoice_brief.py` for short spoken replies. The speak tool for desktop chats, `notchvoice_mcp.py`, and the `nv` command, `nv.py`, go there too. An existing file with the same name is saved with a `.bak` extension first.
-2. It links `~/.local/bin/nv` to `nv.py`, unless a different `nv` is already there, and adds the `/read` command to `~/.claude/commands/`.
+2. It links `~/.local/bin/nv` to `nv.py`, unless a different `nv` is already there, and adds the `/read` and `/main` commands to `~/.claude/commands/`.
 3. It adds the hooks to `~/.claude/settings.json` as `Stop`, `PermissionRequest` and `UserPromptSubmit` hooks, and keeps a backup of that file. It also denies the desktop speak tool there, so Claude Code doesn't read its replies twice.
 4. It builds the app on your Mac and puts it in `~/Applications`. Because the app is built locally, macOS doesn't show a security warning.
 5. It starts the app, which then opens at login.

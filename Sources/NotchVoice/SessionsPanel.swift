@@ -20,8 +20,10 @@ struct SessionsPanel: View {
                             session: session,
                             isExpanded: expanded.contains(session.id),
                             isSpeaking: speech.playback.current?.sessionID == session.id,
+                            isMain: speech.mainSessionID == session.id,
                             accent: accent,
                             toggle: { toggle(session.id) },
+                            setMain: { speech.setMain(sessionID: $0 ? session.id : nil) },
                             play: { if let latest = session.reply(back: 0) { speech.play(latest, in: session) } },
                             setMuted: { speech.setMuted(session, $0) }
                         )
@@ -99,8 +101,10 @@ private struct SessionRow: View {
     let session: Session
     let isExpanded: Bool
     let isSpeaking: Bool
+    let isMain: Bool
     let accent: LinearGradient
     let toggle: () -> Void
+    let setMain: (Bool) -> Void
     let play: () -> Void
     let setMuted: (Bool) -> Void
 
@@ -145,6 +149,17 @@ private struct SessionRow: View {
             }
             .buttonStyle(.plain)
             .help("Play the latest reply")
+
+            Button { setMain(!isMain) } label: {
+                Image(systemName: isMain ? "star.fill" : "star")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(isMain ? AnyShapeStyle(accent) : AnyShapeStyle(Color.white.opacity(0.35)))
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(isMain ? "Stop treating this as the main session" : "Make this the main session: its replies are read, and the others are only announced")
+            .accessibilityLabel(isMain ? "Unset main session" : "Make \(session.name) the main session")
 
             Button { setMuted(!session.isMuted) } label: {
                 Image(systemName: session.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")

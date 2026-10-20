@@ -82,7 +82,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Sessions")
                 } footer: {
-                    Text("Replies wait their turn instead of cutting each other off. The session you're working in is the one you last wrote to; the others only say \"New response from\" and their name.")
+                    Text("Replies wait their turn instead of cutting each other off. The session you're working in is your main session, set with /main or the star in the notch, or else the one you last wrote to. The others only say \"New response from\" and their name.")
                 }
                 Section {
                     LabeledContent("Music volume") {

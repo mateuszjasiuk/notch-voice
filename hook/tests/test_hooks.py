@@ -193,6 +193,16 @@ class NvTests(unittest.TestCase):
         self.assertEqual(nv.request_for("mute", ["web"]), {"type": "mute", "session": "web"})
         self.assertEqual(nv.request_for("say", ["hello", "there"]), {"type": "say", "text": "hello there"})
 
+    def test_main_picks_this_session_inside_claude_code_or_a_named_one(self):
+        with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": "abc-123"}):
+            self.assertEqual(nv.request_for("main", []), {"type": "main", "session_id": "abc-123"})
+        self.assertEqual(nv.request_for("main", ["api"]), {"type": "main", "session": "api"})
+        self.assertEqual(nv.request_for("main", ["off"]), {"type": "main", "off": True})
+        with mock.patch.dict(os.environ):
+            os.environ.pop("CLAUDE_CODE_SESSION_ID", None)
+            with self.assertRaises(nv.UsageError):
+                nv.request_for("main", [])
+
     def test_say_reads_standard_input_without_text(self):
         self.assertEqual(nv.request_for("say", ["-"], stdin=io.StringIO("from a pipe\n")), {"type": "say", "text": "from a pipe"})
         self.assertEqual(nv.request_for("say", [], stdin=io.StringIO("piped")), {"type": "say", "text": "piped"})
