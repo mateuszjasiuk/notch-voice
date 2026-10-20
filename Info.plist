@@ -18,6 +18,8 @@
 	<string>6</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>NotchVoice turns Spotify and Music down while Claude speaks, then back up.</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHighResolutionCapable</key>

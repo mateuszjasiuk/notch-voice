@@ -84,7 +84,95 @@ class SpeakTests(unittest.TestCase):
                     os.environ["TMPDIR"] = tmpdir
                 fresh_speak, fresh_permission = load("speak"), load("notchvoice_permission")
             self.assertEqual(Path(fresh_speak.OWNER_FILE).parent, app_folder)
+            self.assertEqual(Path(fresh_speak.SOCKET).parent, app_folder)
             self.assertEqual(Path(fresh_permission.SOCKET).parent, app_folder)
+
+
+def fake_app(path, answer=b'{"ok":true}\n'):
+    """A one-request stand-in for the app's socket. Returns the thread and a list that receives the request."""
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    server.bind(path)
+    server.listen(1)
+    received = []
+
+    def serve():
+        connection, _ = server.accept()
+        received.append(json.loads(connection.makefile().readline()))
+        connection.sendall(answer)
+        connection.close()
+        server.close()
+
+    thread = threading.Thread(target=serve)
+    thread.start()
+    return thread, received
+
+
+class SpeakToAppTests(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory(dir="/tmp")
+        self.addCleanup(folder.cleanup)
+        self.folder = folder.name
+        self.socket_path = os.path.join(self.folder, "notch.sock")
+        environment = mock.patch.dict(os.environ)
+        environment.start()
+        self.addCleanup(environment.stop)
+        os.environ.pop("NOTCHVOICE_SESSION_NAME", None)
+
+    def git(self, *args):
+        subprocess.run(["git", "-C", self.folder, *args], check=True, capture_output=True)
+
+    def test_session_name_comes_from_the_environment_then_the_branch_then_the_folder(self):
+        project = os.path.join(self.folder, "my-project")
+        os.mkdir(project)
+        self.assertEqual(speak.session_name(project), "my-project")
+        self.git("init", "-q", "-b", "feat/api", project)
+        self.assertEqual(speak.session_name(project), "feat/api")
+        os.environ["NOTCHVOICE_SESSION_NAME"] = "reviewer"
+        self.assertEqual(speak.session_name(project), "reviewer")
+
+    def test_a_detached_head_falls_back_to_the_worktree_folder(self):
+        project = os.path.join(self.folder, "worktree-b")
+        os.mkdir(project)
+        self.git("init", "-q", project)
+        subprocess.run(["git", "-C", project, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "x"], check=True)
+        subprocess.run(["git", "-C", project, "checkout", "-q", "--detach"], check=True)
+        os.mkdir(os.path.join(project, "src"))
+        self.assertEqual(speak.session_name(os.path.join(project, "src")), "worktree-b")
+
+    def test_desktop_chats_share_one_session(self):
+        self.assertEqual(speak.session_name(None), "Claude chat")
+
+    def test_sends_the_reply_to_the_app(self):
+        thread, received = fake_app(self.socket_path)
+        with mock.patch.object(speak, "SOCKET", self.socket_path):
+            sent = speak.send_to_app({"session_id": "abc", "cwd": self.folder}, "Hello")
+        thread.join()
+        self.assertTrue(sent)
+        message = received[0]
+        self.assertEqual(message["type"], "reply")
+        self.assertEqual(message["session_id"], "abc")
+        self.assertEqual(message["text"], "Hello")
+        self.assertEqual(message["cwd"], self.folder)
+        self.assertIsInstance(message["timestamp"], float)
+
+    def test_without_the_app_nothing_is_sent(self):
+        with mock.patch.object(speak, "SOCKET", self.socket_path):
+            self.assertFalse(speak.send_to_app({"session_id": "abc"}, "Hello"))
+
+    def test_the_app_speaks_so_the_hook_does_not(self):
+        with mock.patch.object(speak, "send_to_app", return_value=True) as send, mock.patch.object(speak.subprocess, "Popen") as popen:
+            run_main(speak, {"session_id": "abc", "last_assistant_message": "**Done.**"})
+        self.assertEqual(send.call_args.args[1], "Done.")
+        popen.assert_not_called()
+
+    def test_muted_replies_still_reach_the_app_but_are_not_spoken_without_it(self):
+        mute_file = Path(self.folder) / "tts_off"
+        mute_file.touch()
+        with mock.patch.object(speak, "MUTE_FILE", str(mute_file)), mock.patch.object(speak, "send_to_app", return_value=False) as send, \
+                mock.patch.object(speak.subprocess, "Popen") as popen:
+            run_main(speak, {"session_id": "abc", "last_assistant_message": "Done."})
+        send.assert_called_once()
+        popen.assert_not_called()
 
 
 class BriefTests(unittest.TestCase):

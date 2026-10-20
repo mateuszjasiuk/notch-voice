@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-"""Stop hook: read Claude's last reply aloud with macOS `say` (fully offline).
+"""Stop hook: read Claude's last reply aloud (fully offline).
 
-Settings come from ~/.claude/tts_settings.json, which the NotchVoice notch app writes:
+When the NotchVoice app is running, the reply goes to it over its socket, and the app reads replies from all sessions
+one at a time, each starting with the session's name. The name is $NOTCHVOICE_SESSION_NAME, else the git branch, else
+the project folder. Without the app, this hook speaks the reply itself with macOS `say`.
+
+Settings for speaking without the app come from ~/.claude/tts_settings.json, which the NotchVoice notch app writes:
   voice  a voice for `say -v`, else $CLAUDE_TTS_VOICE, else the system Spoken Content voice
   rate   words per minute, else $CLAUDE_TTS_RATE, else the voice's own rate
   duck   how loud Spotify / Music stay while speaking, as a fraction of their volume, else $CLAUDE_TTS_DUCK, else 0.5
@@ -11,9 +15,11 @@ import json
 import os
 import re
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
+import time
 
 HOME = os.path.expanduser("~")
 MUTE_FILE = os.path.join(HOME, ".claude", "tts_off")
@@ -34,6 +40,9 @@ def user_temp_dir():
 # "<hook pid> <say pid>" of the reply currently speaking (or getting ready to).
 OWNER_FILE = os.path.join(user_temp_dir(), "claude_tts_owner")
 DUCK_FILE = os.path.join(user_temp_dir(), "claude_tts_duck.json")
+SOCKET = os.path.join(user_temp_dir(), "notchvoice.sock")
+# Chats in the Claude desktop app have no session id; they share one session.
+DESKTOP_SESSION = ("claude-desktop", "Claude chat")
 
 
 def is_tool_result_only(content):
@@ -70,6 +79,46 @@ def clean(text):
     text = re.sub(r"^\s*[-*]\s+", "", text, flags=re.M)
     text = re.sub(r"[*_~]{1,3}", "", text)
     return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def git(cwd, *args):
+    try:
+        result = subprocess.run(["git", "-C", cwd, *args], capture_output=True, text=True, timeout=2)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def session_name(cwd):
+    name = os.environ.get("NOTCHVOICE_SESSION_NAME", "").strip()
+    if name or not cwd:
+        return name or DESKTOP_SESSION[1]
+    # Empty on a detached HEAD, and unlike rev-parse it works before the first commit.
+    branch = git(cwd, "symbolic-ref", "--short", "-q", "HEAD")
+    if branch:
+        return branch
+    return os.path.basename(git(cwd, "rev-parse", "--show-toplevel") or os.path.normpath(cwd))
+
+
+def send_to_app(payload, text):
+    """Hands the reply to the NotchVoice app. Returns False when the app isn't there to take it."""
+    cwd = payload.get("cwd")
+    message = {
+        "type": "reply",
+        "session_id": payload.get("session_id") or DESKTOP_SESSION[0],
+        "session_name": session_name(cwd),
+        "cwd": cwd,
+        "text": text,
+        "timestamp": time.time(),
+    }
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+            connection.settimeout(2)
+            connection.connect(SOCKET)
+            connection.sendall((json.dumps(message) + "\n").encode())
+            return bool(connection.makefile().readline())
+    except OSError:
+        return False
 
 
 def load_settings():
@@ -157,14 +206,17 @@ def restore_music():
 
 
 def main():
-    if os.path.exists(MUTE_FILE) and not os.environ.get("NOTCHVOICE_SAMPLE"):
-        return
     payload = json.load(sys.stdin)
     text = payload.get("last_assistant_message") or last_reply_from_transcript(
         payload.get("transcript_path", "")
     )
     text = clean(text or "")
     if not text:
+        return
+    # The app keeps muted replies too, so they can be played later; it decides what to say.
+    if send_to_app(payload, text):
+        return
+    if os.path.exists(MUTE_FILE) and not os.environ.get("NOTCHVOICE_SAMPLE"):
         return
 
     settings = load_settings()

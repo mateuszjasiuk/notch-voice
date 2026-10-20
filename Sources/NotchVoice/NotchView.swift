@@ -4,6 +4,7 @@ import SwiftUI
 struct NotchRootView: View {
     @ObservedObject var state: NotchState
     @ObservedObject var voice: VoiceController
+    @ObservedObject var speech: SpeechCenter
     @ObservedObject var preferences: Preferences
     let answer: @MainActor (UUID, PermissionResponse) -> Void
     let openSettings: @MainActor () -> Void
@@ -13,8 +14,8 @@ struct NotchRootView: View {
             metrics: state.metrics,
             isOpen: state.isOpen,
             isEnabled: voice.isEnabled,
-            isSpeaking: voice.isSpeaking,
-            isGlowing: voice.isSpeaking || state.isPreviewingGlow || state.prompt != nil,
+            isSpeaking: speech.isSpeaking,
+            isGlowing: speech.isSpeaking || state.isPreviewingGlow || state.prompt != nil,
             theme: preferences.theme,
             prompt: state.prompt,
             pendingCount: state.pendingCount,

@@ -56,9 +56,9 @@ final class NotchController {
     private var permissionChanges: AnyCancellable?
     private var glowPreview = 0
 
-    init(voice: VoiceController, preferences: Preferences, permissions: PermissionCenter, openSettings: @escaping @MainActor () -> Void) {
+    init(voice: VoiceController, speech: SpeechCenter, preferences: Preferences, permissions: PermissionCenter, openSettings: @escaping @MainActor () -> Void) {
         self.voice = voice
-        let root = NotchRootView(state: state, voice: voice, preferences: preferences, answer: permissions.answer, openSettings: openSettings)
+        let root = NotchRootView(state: state, voice: voice, speech: speech, preferences: preferences, answer: permissions.answer, openSettings: openSettings)
         let host = NotchHostingView(rootView: root)
         host.sizingOptions = []
         panel.contentView = host

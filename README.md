@@ -18,7 +18,7 @@ Hear every Claude Code reply spoken aloud, and allow or deny Claude's requests r
 
 ## Features
 
-- **Spoken replies.** Claude Code reads each reply aloud as soon as it finishes. Speech runs fully offline through macOS `say`, with markdown tidied up and code blocks skipped.
+- **Spoken replies.** Claude Code reads each reply aloud as soon as it finishes. With several sessions open, replies wait their turn and start with the session's name. Speech runs fully offline through macOS `say`, with markdown tidied up and code blocks skipped.
 - **A notch that glows.** A soft, shifting glow surrounds the notch while Claude talks.
 - **Short spoken replies.** While voice replies are on, Claude is reminded with every prompt to answer in a few sentences, so replies are quick to listen to.
 - **Music steps aside.** Spotify and Apple Music get quieter while Claude speaks, then return to the volume they were at.
@@ -89,6 +89,7 @@ Click the cog in the notch to open settings. Changes apply to the next reply, wi
 - **Voice.** By default NotchVoice uses your Mac's own spoken content voice, and the menu shows its name, for example "Siri Voice 1 (System)". **Change System Voice…** opens the Spoken Content page in System Settings, where that voice is chosen. You can also choose any other installed macOS voice, and you hear a short sample as soon as you pick one.
 - **Speed.** Set how fast replies are read, from 0.6× to 2×.
 - **Short replies.** Turn the "keep spoken replies short" reminder on or off. It's on by default.
+- **New replies.** Choose whether replies are read aloud as they arrive, or only announced with the session's name, so you can play them when you're ready.
 - **Music volume.** Choose how loud Spotify and Apple Music stay while Claude speaks, from silent to unchanged.
 - **Glow.** Choose from six colour themes. The notch lights up briefly to preview the one you pick.
 - **Permissions.** Turn permission requests in the notch on or off.
@@ -130,29 +131,32 @@ On a Mac without a notch, the panel sits at the top center of the screen instead
 ```mermaid
 flowchart LR
     A["Claude Code finishes a reply"] --> B["speak.py (Stop hook)"]
-    B --> C["say reads the reply aloud"]
-    B --> D["Spotify and Music get quieter"]
-    B -.->|writes| E[("Shared files")]
-    F["NotchVoice in the notch"] -.->|reads and writes| E
+    B -->|"the reply, over a local socket"| F["NotchVoice in the notch"]
+    F --> C["say reads replies aloud, one at a time"]
+    F --> D["Spotify and Music get quieter"]
+    F -.->|writes| E[("Shared files")]
+    B -.->|reads| E
     G["Claude asks for permission"] --> H["notchvoice_permission.py (PermissionRequest hook)"]
     H <-->|"request and answer, over a local socket"| F
 ```
 
-The Stop hook does the speaking. The app gives you the controls and the glow. They share three small files:
+The Stop hook sends each reply to the app, with the session it came from. The app reads replies one at a time, so when several sessions finish together, nobody gets cut off. Each reply starts with the session's name, for example "Response from feat api". The name is the session's git branch, or its folder when there is no branch. To choose a name yourself, start Claude Code with `NOTCHVOICE_SESSION_NAME` set. In settings, **New replies** can be set to **Only say who replied**, which says "New response from …" and leaves the reply for you to play later.
+
+If the app isn't running, the Stop hook reads the reply aloud itself, as before. The hook and the app share three small files:
 
 | File | Written by | Used for |
 | --- | --- | --- |
-| `~/.claude/tts_off` | The switch | While this file exists, the hook stays silent. |
-| `~/.claude/tts_settings.json` | The settings window | Holds `voice`, `rate` (words per minute), `duck` (how loud the music stays, from 0 to 1) and `brief` (the short-replies reminder). The Stop hook passes the voice and rate to `say`. |
-| `$TMPDIR/claude_tts_owner` | The hook | Holds `<hook pid> <say pid>` while a reply is spoken. The glow follows this file. |
+| `~/.claude/tts_off` | The switch | While this file exists, nothing is read aloud. The app still keeps the replies. |
+| `~/.claude/tts_settings.json` | The settings window | Holds `voice`, `rate` (words per minute), `duck` (how loud the music stays, from 0 to 1) and `brief` (the short-replies reminder). |
+| `$TMPDIR/claude_tts_owner` | The hook | Used only when the app isn't running. Holds `<hook pid> <say pid>` while the hook speaks a reply. |
 
 `$TMPDIR` here is your Mac's own temporary folder. The hooks look it up from macOS, because tools started by the Claude desktop app don't get the variable.
 
-In the desktop app's chats, Claude calls the `speak` tool from `notchvoice_mcp.py`, a small MCP server that runs `speak.py` with the text. Claude Code must not use it, because the `Stop` hook already speaks there. The desktop app shares its tools with its Code sessions, so the installer denies `mcp__notchvoice__speak` in `settings.json`.
+In the desktop app's chats, Claude calls the `speak` tool from `notchvoice_mcp.py`, a small MCP server that runs `speak.py` with the text. These replies all belong to one session, called "Claude chat". Claude Code must not use it, because the `Stop` hook already speaks there. The desktop app shares its tools with its Code sessions, so the installer denies `mcp__notchvoice__speak` in `settings.json`.
 
 The `UserPromptSubmit` hook adds a one-line reminder to each prompt while voice replies are on and `brief` isn't turned off. The reminder asks Claude to keep its final answer to a few spoken sentences.
 
-The permission hook sends each request to the app over a Unix socket at `$TMPDIR/notchvoice.sock`, then prints the app's answer as the hook's decision. Claude Code shows its own prompt at the same time. If you answer there first, the hook sees the result in the session transcript and withdraws the card. If the app isn't running, the hook exits straight away, and Claude Code asks as usual.
+The permission hook sends each request to the app over the same Unix socket, `$TMPDIR/notchvoice.sock`, then prints the app's answer as the hook's decision. Claude Code shows its own prompt at the same time. If you answer there first, the hook sees the result in the session transcript and withdraws the card. If the app isn't running, the hook exits straight away, and Claude Code asks as usual.
 
 Right-click the panel for **Settings…** and **Quit**.
 
@@ -165,6 +169,7 @@ The settings window covers everything you need day to day. If you use the hook w
 | `CLAUDE_TTS_VOICE` | System voice | The voice to use. |
 | `CLAUDE_TTS_RATE` | The voice's own rate | Speaking rate, in words per minute. |
 | `CLAUDE_TTS_DUCK` | `0.5` | How loud the music stays while Claude speaks, as a fraction of its volume. |
+| `NOTCHVOICE_SESSION_NAME` | The git branch, or the folder | The name said before this session's replies. Set it when you start Claude Code. |
 
 ## Uninstall
 

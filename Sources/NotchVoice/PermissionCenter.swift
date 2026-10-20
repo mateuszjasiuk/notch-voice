@@ -20,25 +20,19 @@ final class PermissionCenter: ObservableObject {
     @Published private(set) var queue: [PermissionPrompt] = []
     var isEnabled: () -> Bool = { true }
 
-    private var connections: [UUID: PermissionConnection] = [:]
-    private lazy var server = PermissionServer(
-        onRequest: { [weak self] connection, line in
-            let request = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any] ?? [:]
-            let toolName = request["tool_name"] as? String ?? "a tool"
-            let input = request["tool_input"] as? [String: Any] ?? [:]
-            let cwd = request["cwd"] as? String
-            let prompt = PermissionPrompt(id: connection.id, toolName: toolName, input: input, cwd: cwd)
-            DispatchQueue.main.async { MainActor.assumeIsolated { self?.add(prompt, connection: connection) } }
-        },
-        onClose: { [weak self] connection in
-            DispatchQueue.main.async { MainActor.assumeIsolated { self?.remove(connection.id) } }
-        }
-    )
+    private var connections: [UUID: SocketConnection] = [:]
 
     var current: PermissionPrompt? { queue.first }
 
-    func start() {
-        server.start()
+    func receive(_ request: [String: Any], from connection: SocketConnection) {
+        let toolName = request["tool_name"] as? String ?? "a tool"
+        let input = request["tool_input"] as? [String: Any] ?? [:]
+        let prompt = PermissionPrompt(id: connection.id, toolName: toolName, input: input, cwd: request["cwd"] as? String)
+        add(prompt, connection: connection)
+    }
+
+    func connectionClosed(_ id: UUID) {
+        remove(id)
     }
 
     func answer(_ id: UUID, _ response: PermissionResponse) {
@@ -52,7 +46,7 @@ final class PermissionCenter: ObservableObject {
         queue.removeAll()
     }
 
-    private func add(_ prompt: PermissionPrompt, connection: PermissionConnection) {
+    private func add(_ prompt: PermissionPrompt, connection: SocketConnection) {
         guard isEnabled() else { return connection.reply(PermissionResponse.dismiss.rawValue) }
         connections[prompt.id] = connection
         queue.append(prompt)

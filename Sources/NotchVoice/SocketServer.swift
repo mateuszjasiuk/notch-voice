@@ -1,19 +1,20 @@
 import Foundation
 import os
 
-private let log = Logger(subsystem: "local.notchvoice", category: "permissions")
+private let log = Logger(subsystem: "local.notchvoice", category: "socket")
 
-// Listens on a Unix socket for the PermissionRequest hook. Each connection carries one request line and gets one
-// reply line; if the hook goes away first (Claude answered elsewhere or gave up), the connection reports it closed.
-final class PermissionServer: @unchecked Sendable {
+// Listens on a Unix socket for the hooks and the nv command. Each connection carries one JSON request line and gets
+// one JSON reply line; if the client goes away first (Claude answered elsewhere or gave up), the connection reports
+// it closed. CONTRIBUTING.md describes the messages.
+final class SocketServer: @unchecked Sendable {
     static let socketPath = URL(filePath: NSTemporaryDirectory()).appending(path: "notchvoice.sock").path
 
-    private let queue = DispatchQueue(label: "local.notchvoice.permissions")
-    private let onRequest: @Sendable (PermissionConnection, Data) -> Void
-    private let onClose: @Sendable (PermissionConnection) -> Void
+    private let queue = DispatchQueue(label: "local.notchvoice.socket")
+    private let onRequest: @Sendable (SocketConnection, Data) -> Void
+    private let onClose: @Sendable (SocketConnection) -> Void
     private var listener: DispatchSourceRead?
 
-    init(onRequest: @escaping @Sendable (PermissionConnection, Data) -> Void, onClose: @escaping @Sendable (PermissionConnection) -> Void) {
+    init(onRequest: @escaping @Sendable (SocketConnection, Data) -> Void, onClose: @escaping @Sendable (SocketConnection) -> Void) {
         self.onRequest = onRequest
         self.onClose = onClose
     }
@@ -53,7 +54,10 @@ final class PermissionServer: @unchecked Sendable {
     private func accept(from descriptor: Int32) {
         let client = Darwin.accept(descriptor, nil, nil)
         guard client >= 0 else { return }
-        let connection = PermissionConnection(descriptor: client, queue: queue)
+        // A client that hangs up before its reply is written must not take the app down with SIGPIPE.
+        var noSigPipe: Int32 = 1
+        setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, socklen_t(MemoryLayout<Int32>.size))
+        let connection = SocketConnection(descriptor: client, queue: queue)
         connection.start(
             onLine: { [onRequest] line in onRequest(connection, line) },
             onClose: { [onClose] in onClose(connection) }
@@ -61,7 +65,7 @@ final class PermissionServer: @unchecked Sendable {
     }
 }
 
-final class PermissionConnection: @unchecked Sendable, Identifiable {
+final class SocketConnection: @unchecked Sendable, Identifiable {
     let id = UUID()
     private let descriptor: Int32
     private let queue: DispatchQueue
@@ -104,11 +108,24 @@ final class PermissionConnection: @unchecked Sendable, Identifiable {
     }
 
     func reply(_ decision: String) {
+        send(["decision": decision])
+    }
+
+    func send(_ message: [String: Any]) {
+        guard var data = try? JSONSerialization.data(withJSONObject: message, options: [.sortedKeys, .withoutEscapingSlashes]) else { return }
+        data.append(UInt8(ascii: "\n"))
+        let line = data
         queue.async { [self] in
             guard !isFinished else { return }
             isFinished = true
-            let line = Array("{\"decision\":\"\(decision)\"}\n".utf8)
-            _ = line.withUnsafeBytes { write(descriptor, $0.baseAddress, $0.count) }
+            line.withUnsafeBytes { bytes in
+                var offset = 0
+                while offset < bytes.count {
+                    let written = write(descriptor, bytes.baseAddress! + offset, bytes.count - offset)
+                    if written <= 0 { break }
+                    offset += written
+                }
+            }
             source?.cancel()
         }
     }

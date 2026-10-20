@@ -23,6 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var notch: NotchController?
     private var settings: SettingsWindowController?
     private var permissions: PermissionCenter?
+    private var speech: SpeechCenter?
+    private var server: SocketServer?
     private var permissionSetting: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -41,13 +43,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         permissionSetting = preferences.$asksForPermission.dropFirst().filter { !$0 }.sink { _ in
             MainActor.assumeIsolated { permissions.handBackAll() }
         }
-        permissions.start()
         self.permissions = permissions
+        let speech = SpeechCenter(voice: voice)
+        speech.mode = { preferences.readingMode }
+        voice.speak = { speech.say($0) }
+        self.speech = speech
+        server = makeServer(permissions: permissions, speech: speech)
         let settings = SettingsWindowController(voice: voice, preferences: preferences)
         self.settings = settings
-        notch = NotchController(voice: voice, preferences: preferences, permissions: permissions) { settings.show() }
+        notch = NotchController(voice: voice, speech: speech, preferences: preferences, permissions: permissions) { settings.show() }
         NSApp.mainMenu = makeMainMenu()
         LoginItem.enableOnFirstLaunch()
+    }
+
+    // Requests without a type come from permission hooks installed before types were added.
+    private func makeServer(permissions: PermissionCenter, speech: SpeechCenter) -> SocketServer {
+        let server = SocketServer(
+            onRequest: { connection, line in
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        let request = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any] ?? [:]
+                        switch request["type"] as? String {
+                        case nil, "permission": permissions.receive(request, from: connection)
+                        default: connection.send(speech.handle(request))
+                        }
+                    }
+                }
+            },
+            onClose: { connection in
+                DispatchQueue.main.async { MainActor.assumeIsolated { permissions.connectionClosed(connection.id) } }
+            }
+        )
+        server.start()
+        return server
     }
 
     @objc private func showSettings() {
