@@ -11,6 +11,7 @@ Thanks for helping out. NotchVoice is a small project, so focused pull requests 
   - `notchvoice_brief.py` is the `UserPromptSubmit` hook. It asks Claude to keep spoken replies short.
 - **`hook/notchvoice_mcp.py`** is a small MCP server for chats in the Claude desktop app. Its `speak` tool runs `speak.py` with the text Claude passes in.
 - **`hook/nv.py`** is the `nv` command. It sends requests to the app over the socket and prints the answers.
+- **`commands/read.md`** is the `/read` command for Claude Code. It tells Claude to find the passage the user asked for and read it with `nv say`.
 - **`hook/notchvoice_desktop.py`** adds that server to the desktop app's config for `install.sh`, or removes it. The desktop app rewrites its config while it's open, so when it's open the script makes the change again after the app quits.
 - **`Tests/`** and **`hook/tests/`** hold the tests for the app and the hooks.
 
@@ -38,6 +39,8 @@ The `type` field says what the request is:
 `session` can be a session's name, its id, or the start of either, as long as only one session matches. Without `session`, the app uses the session that replied most recently.
 
 Requests that you make yourself (`say`, `read`, `next`) play even while voice replies are switched off. If they cut off a reply, that reply goes back to the front of the queue and is read again from the start afterwards. The app keeps history in memory only, so it starts empty each time the app opens.
+
+When Claude runs `nv say`, `nv read` or `nv next`, `nv` creates an empty file named after the session (`$CLAUDE_CODE_SESSION_ID`) in `$TMPDIR/notchvoice-spoken/`. The Stop hook then removes it and doesn't send that turn's reply, so `/read` is heard once. `notchvoice_brief.py` also removes it when the next prompt starts, in case the turn was cut short.
 
 Try it with `nc`:
 

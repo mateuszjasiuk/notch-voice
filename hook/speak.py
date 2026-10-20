@@ -41,6 +41,9 @@ def user_temp_dir():
 OWNER_FILE = os.path.join(user_temp_dir(), "claude_tts_owner")
 DUCK_FILE = os.path.join(user_temp_dir(), "claude_tts_duck.json")
 SOCKET = os.path.join(user_temp_dir(), "notchvoice.sock")
+# nv leaves a file named after the session here when Claude reads something aloud with it, e.g. for /read.
+# That turn's reply is then not read as well. notchvoice_brief.py clears it when the next prompt starts.
+SPOKEN_DIR = os.path.join(user_temp_dir(), "notchvoice-spoken")
 # Chats in the Claude desktop app have no session id; they share one session.
 DESKTOP_SESSION = ("claude-desktop", "Claude chat")
 
@@ -79,6 +82,17 @@ def clean(text):
     text = re.sub(r"^\s*[-*]\s+", "", text, flags=re.M)
     text = re.sub(r"[*_~]{1,3}", "", text)
     return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def already_spoken(session_id):
+    """True, once, when nv already read something aloud for this turn."""
+    if not session_id or not re.fullmatch(r"[\w-]+", session_id):
+        return False
+    try:
+        os.remove(os.path.join(SPOKEN_DIR, session_id))
+        return True
+    except OSError:
+        return False
 
 
 def git(cwd, *args):
@@ -207,6 +221,8 @@ def restore_music():
 
 def main():
     payload = json.load(sys.stdin)
+    if already_spoken(payload.get("session_id")):
+        return
     text = payload.get("last_assistant_message") or last_reply_from_transcript(
         payload.get("transcript_path", "")
     )

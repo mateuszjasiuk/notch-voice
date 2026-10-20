@@ -252,6 +252,59 @@ class NvTests(unittest.TestCase):
         self.assertEqual(answer, {"ok": True, "session": "api"})
 
 
+class AlreadySpokenTests(unittest.TestCase):
+    """/read: when Claude reads something aloud with nv, the Stop hook must not read that turn's reply too."""
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.spoken_dir = os.path.join(folder.name, "spoken")
+        for module in (speak, nv, brief):
+            patcher = mock.patch.object(module, "SPOKEN_DIR", self.spoken_dir)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def nv_in_session(self, *argv, session_id="abc-123"):
+        with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": session_id}), \
+                mock.patch.object(nv, "send", return_value={"ok": True, "session": "api"}), redirect_stdout(io.StringIO()):
+            return nv.main(list(argv))
+
+    def test_the_stop_hook_skips_a_turn_where_nv_spoke_but_only_that_turn(self):
+        self.nv_in_session("say", "The migration part.")
+        with mock.patch.object(speak, "send_to_app", return_value=True) as send:
+            run_main(speak, {"session_id": "abc-123", "last_assistant_message": "Read it."})
+            send.assert_not_called()
+            run_main(speak, {"session_id": "abc-123", "last_assistant_message": "Next turn."})
+            send.assert_called_once()
+
+    def test_other_sessions_are_still_read(self):
+        self.nv_in_session("read", "api")
+        with mock.patch.object(speak, "send_to_app", return_value=True) as send:
+            run_main(speak, {"session_id": "other", "last_assistant_message": "Hi."})
+        send.assert_called_once()
+
+    def test_commands_that_say_nothing_leave_no_marker(self):
+        self.nv_in_session("list")
+        self.nv_in_session("mute", "api")
+        self.assertFalse(os.path.exists(self.spoken_dir) and os.listdir(self.spoken_dir))
+
+    def test_outside_claude_code_nv_leaves_no_marker(self):
+        with mock.patch.dict(os.environ), mock.patch.object(nv, "send", return_value={"ok": True}), redirect_stdout(io.StringIO()):
+            os.environ.pop("CLAUDE_CODE_SESSION_ID", None)
+            nv.main(["say", "hello"])
+        self.assertFalse(os.path.exists(self.spoken_dir))
+
+    def test_odd_session_ids_never_become_paths(self):
+        self.nv_in_session("say", "hi", session_id="../escape")
+        self.assertFalse(os.path.exists(self.spoken_dir))
+        self.assertFalse(speak.already_spoken("../escape"))
+
+    def test_a_new_prompt_clears_a_marker_left_by_an_interrupted_turn(self):
+        self.nv_in_session("say", "hi")
+        run_main(brief, {"session_id": "abc-123", "prompt": "next question"})
+        self.assertFalse(speak.already_spoken("abc-123"))
+
+
 class BriefTests(unittest.TestCase):
     def run_hook(self, settings=None, muted=False):
         with tempfile.TemporaryDirectory() as folder:

@@ -88,6 +88,17 @@ nv say "Hello"          # read any text
 
 A session can be given by the start of its name, as long as only one session matches. Replies you ask for play straight away, even while voice replies are switched off. The history lives in the app, so it starts empty each time the app opens.
 
+### Ask Claude to read something: `/read`
+
+In Claude Code, `/read` asks Claude to find a passage and read just that part aloud. For example:
+
+```
+/read the part about the migration
+/read the steps from the api session's last reply
+```
+
+Claude finds the text in its own conversation, or in another session's history with `nv`, and reads it with `nv say`. Its short answer afterwards isn't read aloud, so you only hear the part you asked for.
+
 ## Regular Claude chats
 
 Chats in the Claude desktop app can be read aloud too. The installer adds a small local tool called `speak` to the desktop app, and NotchVoice asks Claude to call it at the end of each reply with a short spoken summary. It uses the same voice, glow, music ducking and mute switch as Claude Code.
@@ -139,7 +150,7 @@ NotchVoice works wherever Claude Code runs on your Mac: in the terminal, in the 
 The installer does six things:
 
 1. It copies three hooks to `~/.claude/hooks/`: `speak.py` for voice replies, `notchvoice_permission.py` for permission requests, and `notchvoice_brief.py` for short spoken replies. The speak tool for desktop chats, `notchvoice_mcp.py`, and the `nv` command, `nv.py`, go there too. An existing file with the same name is saved with a `.bak` extension first.
-2. It links `~/.local/bin/nv` to `nv.py`, unless a different `nv` is already there.
+2. It links `~/.local/bin/nv` to `nv.py`, unless a different `nv` is already there, and adds the `/read` command to `~/.claude/commands/`.
 3. It adds the hooks to `~/.claude/settings.json` as `Stop`, `PermissionRequest` and `UserPromptSubmit` hooks, and keeps a backup of that file. It also denies the desktop speak tool there, so Claude Code doesn't read its replies twice.
 4. It builds the app on your Mac and puts it in `~/Applications`. Because the app is built locally, macOS doesn't show a security warning.
 5. It starts the app, which then opens at login.
@@ -198,7 +209,7 @@ The settings window covers everything you need day to day. If you use the hook w
 ./install.sh --uninstall
 ```
 
-This removes the app, its login item, the hooks, the speak tool, the `nv` command, and their entries in `settings.json` and the desktop app's config.
+This removes the app, its login item, the hooks, the speak tool, the `nv` and `/read` commands, and their entries in `settings.json` and the desktop app's config.
 
 ## Troubleshooting
 

@@ -14,6 +14,7 @@ A session is its name, or the start of it. Without one, nv uses the session that
 """
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -33,6 +34,9 @@ def user_temp_dir():
 
 
 SOCKET = os.path.join(user_temp_dir(), "notchvoice.sock")
+# Shared with speak.py, which skips a turn's reply when Claude already read something aloud with nv in that turn.
+SPOKEN_DIR = os.path.join(user_temp_dir(), "notchvoice-spoken")
+SPEAKING_COMMANDS = ("say", "read", "next")
 
 
 class UsageError(Exception):
@@ -71,6 +75,18 @@ def request_for(command, args, stdin=sys.stdin):
             raise UsageError("There is nothing to say.")
         return {"type": "say", "text": text.strip()}
     raise UsageError(f"Unknown command: {command}.")
+
+
+def mark_spoken():
+    """Inside Claude Code, tells the Stop hook not to read this turn's reply as well."""
+    session_id = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
+    if not re.fullmatch(r"[\w-]+", session_id):
+        return
+    try:
+        os.makedirs(SPOKEN_DIR, exist_ok=True)
+        open(os.path.join(SPOKEN_DIR, session_id), "w").close()
+    except OSError:
+        pass
 
 
 def send(request):
@@ -133,6 +149,7 @@ def main(argv=None):
     if answer is None:
         if command == "say":
             # Better heard without the app than not at all.
+            mark_spoken()
             subprocess.run(["say"], input=request["text"], text=True)
             return 0
         print("nv: NotchVoice isn't running. Open it from ~/Applications.", file=sys.stderr)
@@ -140,6 +157,8 @@ def main(argv=None):
     if not answer.get("ok"):
         print(f"nv: {answer.get('error', 'Something went wrong.')}", file=sys.stderr)
         return 1
+    if command in SPEAKING_COMMANDS:
+        mark_spoken()
     if as_json:
         print(json.dumps(answer, indent=2))
     elif command == "list":

@@ -7,6 +7,7 @@ HOOKS="$HOME/.claude/hooks"
 SETTINGS="$HOME/.claude/settings.json"
 APP="$HOME/Applications/NotchVoice.app"
 BIN="$HOME/.local/bin"
+COMMANDS="$HOME/.claude/commands"
 
 if [[ "${1:-}" == "--uninstall" ]]; then
   pkill -x NotchVoice || true
@@ -48,6 +49,9 @@ EOF
   if [[ "$(readlink "$BIN/nv" 2>/dev/null)" == "$HOOKS/nv.py" ]]; then
     rm -f "$BIN/nv"
   fi
+  if grep -qs "Installed by NotchVoice" "$COMMANDS/read.md"; then
+    rm -f "$COMMANDS/read.md"
+  fi
   rm -f "$HOOKS/speak.py" "$HOOKS/notchvoice_permission.py" "$HOOKS/notchvoice_brief.py" "$HOOKS/notchvoice_mcp.py" "$HOOKS/nv.py" "$HOME/.claude/tts_off" "$HOME/.claude/tts_settings.json"
   python3 hook/notchvoice_desktop.py
   echo "NotchVoice and its hooks are removed. Restart Claude Code."
@@ -68,6 +72,14 @@ for script in speak.py notchvoice_permission.py notchvoice_brief.py notchvoice_m
   cp "hook/$script" "$HOOKS/$script"
   chmod +x "$HOOKS/$script"
 done
+
+# The /read command for Claude Code.
+mkdir -p "$COMMANDS"
+if [[ -f "$COMMANDS/read.md" ]] && ! cmp -s commands/read.md "$COMMANDS/read.md"; then
+  cp "$COMMANDS/read.md" "$COMMANDS/read.md.bak"
+  echo "Saved your previous /read command as $COMMANDS/read.md.bak"
+fi
+cp commands/read.md "$COMMANDS/read.md"
 
 # The nv command. Another program called nv is left alone.
 mkdir -p "$BIN"
