@@ -67,10 +67,18 @@ struct SessionStoreTests {
         #expect(store.oldestUnread() == nil)
     }
 
-    @Test func branchNamesAreSpokenAsWords() {
+    @Test(arguments: [
+        ("feat/api-fix_2", "api fix 2"),
+        ("sch-605-horesta-spec-gaps", "horesta spec gaps"),
+        ("feature/multi-session-speech-and-more", "multi session speech"),
+        ("1234-fix-login", "fix login"),
+        ("main-2", "main 2"),
+        ("Claude chat", "Claude chat"),
+    ])
+    func branchNamesAreShortenedForSpeech(name: String, spoken: String) {
         var store = SessionStore()
-        store.add(sessionID: "a", name: "feat/api-fix_2", cwd: nil, text: "x")
-        #expect(store.session(id: "a")?.spokenName == "feat api fix 2")
+        store.add(sessionID: "a", name: name, cwd: nil, text: "x")
+        #expect(store.session(id: "a")?.spokenName == spoken)
     }
 
     @Test func repliesSplitIntoParagraphs() {

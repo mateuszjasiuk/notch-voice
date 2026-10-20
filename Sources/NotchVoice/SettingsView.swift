@@ -82,7 +82,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Sessions")
                 } footer: {
-                    Text("Replies from several Claude Code sessions wait their turn, and each starts with the session's name.")
+                    Text("Replies wait their turn instead of cutting each other off. The session you're working in is the one you last wrote to; the others only say \"New response from\" and their name.")
                 }
                 Section {
                     LabeledContent("Music volume") {

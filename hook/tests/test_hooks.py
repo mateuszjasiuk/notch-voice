@@ -263,6 +263,9 @@ class AlreadySpokenTests(unittest.TestCase):
             patcher = mock.patch.object(module, "SPOKEN_DIR", self.spoken_dir)
             patcher.start()
             self.addCleanup(patcher.stop)
+        patcher = mock.patch.object(brief, "tell_app_focus")
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def nv_in_session(self, *argv, session_id="abc-123"):
         with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": session_id}), \
@@ -306,6 +309,25 @@ class AlreadySpokenTests(unittest.TestCase):
 
 
 class BriefTests(unittest.TestCase):
+    def setUp(self):
+        patcher = mock.patch.object(brief, "SOCKET", "/nonexistent/notchvoice.sock")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_tells_the_app_which_session_the_user_is_working_in(self):
+        with tempfile.TemporaryDirectory(dir="/tmp") as folder:
+            path = os.path.join(folder, "notch.sock")
+            thread, received = fake_app(path)
+            with mock.patch.object(brief, "SOCKET", path), redirect_stdout(io.StringIO()):
+                run_main(brief, {"session_id": "abc", "prompt": "hello"})
+            thread.join()
+        self.assertEqual(received, [{"type": "focus", "session_id": "abc"}])
+
+    def test_without_the_app_the_prompt_goes_through_quickly(self):
+        started = time.monotonic()
+        self.assertIn("read aloud", run_main(brief, {"session_id": "abc", "prompt": "hello"}))
+        self.assertLess(time.monotonic() - started, 0.3)
+
     def run_hook(self, settings=None, muted=False):
         with tempfile.TemporaryDirectory() as folder:
             settings_file = Path(folder) / "tts_settings.json"

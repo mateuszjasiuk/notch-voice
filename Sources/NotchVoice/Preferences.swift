@@ -1,6 +1,7 @@
 import Foundation
 
 enum ReadingMode: String, CaseIterable, Identifiable {
+    case focusedSession = "focus"
     case autoRead = "auto"
     case announceOnly = "announce"
 
@@ -8,7 +9,8 @@ enum ReadingMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .autoRead: "Read them aloud"
+        case .focusedSession: "Read the session I'm working in"
+        case .autoRead: "Read them all aloud"
         case .announceOnly: "Only say who replied"
         }
     }
@@ -32,7 +34,7 @@ final class Preferences: ObservableObject {
         theme = UserDefaults.standard.string(forKey: Self.themeKey).flatMap(GlowTheme.init(rawValue:)) ?? .aurora
         opensAtLogin = LoginItem.isEnabled
         asksForPermission = UserDefaults.standard.object(forKey: Self.permissionsKey) as? Bool ?? true
-        readingMode = UserDefaults.standard.string(forKey: Self.readingModeKey).flatMap(ReadingMode.init(rawValue:)) ?? .autoRead
+        readingMode = UserDefaults.standard.string(forKey: Self.readingModeKey).flatMap(ReadingMode.init(rawValue:)) ?? .focusedSession
         self.muteHotkey = muteHotkey
         muteShortcut = Self.savedMuteShortcut.flatMap { muteHotkey.register($0) ? $0 : nil }
     }

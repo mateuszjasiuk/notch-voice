@@ -5,11 +5,12 @@ Claude gets this note with every prompt, so every session keeps its spoken repli
 voice replies are muted (~/.claude/tts_off exists) or when "brief" is false in ~/.claude/tts_settings.json.
 
 It also clears this session's "already spoken" marker (see speak.py), in case the last turn was cut short before the
-Stop hook could clear it.
+Stop hook could clear it, and tells the NotchVoice app that this is the session the user is working in now.
 """
 import json
 import os
 import re
+import socket
 import sys
 import tempfile
 
@@ -33,6 +34,19 @@ def user_temp_dir():
 
 
 SPOKEN_DIR = os.path.join(user_temp_dir(), "notchvoice-spoken")
+SOCKET = os.path.join(user_temp_dir(), "notchvoice.sock")
+
+
+def tell_app_focus(session_id):
+    """Replies from this session are read in full; the app only announces the others. Quick, as this runs on every prompt."""
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+            connection.settimeout(0.5)
+            connection.connect(SOCKET)
+            connection.sendall((json.dumps({"type": "focus", "session_id": session_id}) + "\n").encode())
+            connection.recv(256)
+    except OSError:
+        pass
 
 
 def clear_spoken_marker(session_id):
@@ -56,8 +70,9 @@ def main():
         payload = json.load(sys.stdin)
     except ValueError:
         payload = {}
-    if isinstance(payload, dict):
-        clear_spoken_marker(payload.get("session_id"))
+    if isinstance(payload, dict) and isinstance(payload.get("session_id"), str):
+        clear_spoken_marker(payload["session_id"])
+        tell_app_focus(payload["session_id"])
     if os.path.exists(MUTE_FILE) or not wants_short_replies():
         return
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": REMINDER}}))

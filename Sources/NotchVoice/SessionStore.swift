@@ -24,9 +24,17 @@ struct Session: Identifiable, Equatable {
 
     var unreadCount: Int { replies.filter { !$0.isRead }.count }
 
-    // Branch names like "feat/api-fix" are read as "feat api fix".
+    // Long branch names are tiring to hear before every reply, so only their last part is read, without a ticket
+    // number in front and at most three words: "feature/sch-605-horesta-spec-gaps" is read as "horesta spec gaps".
     var spokenName: String {
-        name.split { "/_-.".contains($0) || $0.isWhitespace }.joined(separator: " ")
+        let last = name.split(separator: "/").last.map(String.init) ?? name
+        var words = last.split { "_-.".contains($0) || $0.isWhitespace }.map(String.init)
+        if words.count > 2, words[0].allSatisfy(\.isLetter), words[1].allSatisfy(\.isNumber) {
+            words.removeFirst(2)
+        } else if words.count > 1, words[0].allSatisfy(\.isNumber) {
+            words.removeFirst()
+        }
+        return words.isEmpty ? name : words.prefix(3).joined(separator: " ")
     }
 
     // 0 is the latest reply, 1 the one before it, and so on.

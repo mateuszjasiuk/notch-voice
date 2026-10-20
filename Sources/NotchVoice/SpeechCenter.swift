@@ -57,7 +57,9 @@ struct PlaybackQueue: Equatable {
 final class SpeechCenter: ObservableObject {
     @Published private(set) var sessions = SessionStore()
     @Published private(set) var playback = PlaybackQueue()
-    var mode: () -> ReadingMode = { .autoRead }
+    var mode: () -> ReadingMode = { .focusedSession }
+    // The session the user last wrote a prompt to, from notchvoice_brief.py.
+    private(set) var focusedSessionID: String?
 
     private let voice: VoiceController
     private let ducker = MusicDucker()
@@ -81,11 +83,24 @@ final class SpeechCenter: ObservableObject {
         voice.refresh()
         guard voice.isEnabled, !session.isMuted else { return }
         switch mode() {
+        case .focusedSession where isFocused(session):
+            // You know which session you're working in, so its replies skip the name.
+            enqueue(utterance(for: reply, in: session, requested: false, announced: false))
         case .autoRead:
             enqueue(utterance(for: reply, in: session, requested: false))
-        case .announceOnly:
+        case .focusedSession, .announceOnly:
             enqueue(Utterance(text: "New response from \(session.spokenName).", label: session.name, sessionID: sessionID))
         }
+    }
+
+    func focus(sessionID: String) {
+        focusedSessionID = sessionID
+    }
+
+    // Before the first prompt there is nothing to go on, so every session counts. Desktop chats have no prompt hook,
+    // and their speak tool is only called in the chat the user is looking at.
+    private func isFocused(_ session: Session) -> Bool {
+        focusedSessionID == nil || session.id == focusedSessionID || session.id == "claude-desktop"
     }
 
     func say(_ text: String) {
@@ -132,9 +147,9 @@ final class SpeechCenter: ObservableObject {
         if let current = playback.current, current.sessionID == session.id, !current.isRequested { skip() }
     }
 
-    private func utterance(for reply: Reply, in session: Session, requested: Bool) -> Utterance {
+    private func utterance(for reply: Reply, in session: Session, requested: Bool, announced: Bool = true) -> Utterance {
         Utterance(
-            text: "Response from \(session.spokenName). [[slnc 300]] \(reply.text)",
+            text: announced ? "Response from \(session.spokenName). [[slnc 300]] \(reply.text)" : reply.text,
             label: session.name, sessionID: session.id, replyID: reply.id, isRequested: requested
         )
     }
@@ -220,6 +235,10 @@ extension SpeechCenter {
                 text: text,
                 date: timestamp.map(Date.init(timeIntervalSince1970:)) ?? .now
             )
+            return ["ok": true]
+        case "focus":
+            guard let sessionID = request["session_id"] as? String, !sessionID.isEmpty else { return failure("Focus needs a session_id.") }
+            focus(sessionID: sessionID)
             return ["ok": true]
         case "say":
             guard let text = request["text"] as? String, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {

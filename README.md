@@ -18,7 +18,7 @@ Hear every Claude Code reply spoken aloud, and allow or deny Claude's requests r
 
 ## Features
 
-- **Spoken replies.** Claude Code reads each reply aloud as soon as it finishes. With several sessions open, replies wait their turn and start with the session's name. Speech runs fully offline through macOS `say`, with markdown tidied up and code blocks skipped.
+- **Spoken replies.** Claude Code reads each reply aloud as soon as it finishes. With several sessions open, replies wait their turn, and replies from the sessions you're not working in are only announced. Speech runs fully offline through macOS `say`, with markdown tidied up and code blocks skipped.
 - **A notch that glows.** A soft, shifting glow surrounds the notch while Claude talks.
 - **Short spoken replies.** While voice replies are on, Claude is reminded with every prompt to answer in a few sentences, so replies are quick to listen to.
 - **Music steps aside.** Spotify and Apple Music get quieter while Claude speaks, then return to the volume they were at.
@@ -70,7 +70,9 @@ To set it, open settings, click **Record** next to **Mute shortcut**, and press 
 
 ## Several sessions and the `nv` command
 
-When several Claude Code sessions finish at once, their replies wait their turn. Each one starts with the session's name, for example "Response from feat api". The name is the session's git branch, or its folder. To choose it yourself, start Claude Code with `NOTCHVOICE_SESSION_NAME` set.
+When several Claude Code sessions finish at once, their replies wait their turn instead of cutting each other off. Replies from the session you're working in, the one you last wrote to, are read aloud. The other sessions only say "New response from" and their name, and you can play their replies when you're ready. To have every reply read, choose **Read them all aloud** under **New replies** in settings.
+
+A session's name is its git branch, or its folder. Only a short form of the name is read aloud: the part after the last slash, without a ticket number in front, and at most three words. For example, `sch-605-horesta-spec-gaps` is read as "horesta spec gaps". To choose the name yourself, start Claude Code with `NOTCHVOICE_SESSION_NAME` set.
 
 The app keeps the last 20 replies of each session, so you can hear them again with the `nv` command:
 
@@ -120,7 +122,7 @@ Click the cog in the notch to open settings. Changes apply to the next reply, wi
 - **Voice.** By default NotchVoice uses your Mac's own spoken content voice, and the menu shows its name, for example "Siri Voice 1 (System)". **Change System Voice…** opens the Spoken Content page in System Settings, where that voice is chosen. You can also choose any other installed macOS voice, and you hear a short sample as soon as you pick one.
 - **Speed.** Set how fast replies are read, from 0.6× to 2×.
 - **Short replies.** Turn the "keep spoken replies short" reminder on or off. It's on by default.
-- **New replies.** Choose whether replies are read aloud as they arrive, or only announced with the session's name, so you can play them when you're ready.
+- **New replies.** Choose whether to read only the session you're working in and announce the others (the default), read every reply, or only announce replies so you can play them when you're ready.
 - **Music volume.** Choose how loud Spotify and Apple Music stay while Claude speaks, from silent to unchanged.
 - **Glow.** Choose from six colour themes. The notch lights up briefly to preview the one you pick.
 - **Permissions.** Turn permission requests in the notch on or off.
@@ -172,7 +174,7 @@ flowchart LR
     H <-->|"request and answer, over a local socket"| F
 ```
 
-The Stop hook sends each reply to the app, with the session it came from. The app reads replies one at a time, so when several sessions finish together, nobody gets cut off. Each reply starts with the session's name, for example "Response from feat api". The name is the session's git branch, or its folder when there is no branch. To choose a name yourself, start Claude Code with `NOTCHVOICE_SESSION_NAME` set. In settings, **New replies** can be set to **Only say who replied**, which says "New response from …" and leaves the reply for you to play later.
+The Stop hook sends each reply to the app, with the session it came from. The app reads replies one at a time, so when several sessions finish together, nobody gets cut off. The `UserPromptSubmit` hook tells the app which session you last wrote to. That session's replies are read in full, and the others are announced by name. See [Several sessions](#several-sessions-and-the-nv-command).
 
 If the app isn't running, the Stop hook reads the reply aloud itself, as before. The hook and the app share three small files:
 
@@ -186,7 +188,7 @@ If the app isn't running, the Stop hook reads the reply aloud itself, as before.
 
 In the desktop app's chats, Claude calls the `speak` tool from `notchvoice_mcp.py`, a small MCP server that runs `speak.py` with the text. These replies all belong to one session, called "Claude chat". Claude Code must not use it, because the `Stop` hook already speaks there. The desktop app shares its tools with its Code sessions, so the installer denies `mcp__notchvoice__speak` in `settings.json`.
 
-The `UserPromptSubmit` hook adds a one-line reminder to each prompt while voice replies are on and `brief` isn't turned off. The reminder asks Claude to keep its final answer to a few spoken sentences.
+The `UserPromptSubmit` hook also adds a one-line reminder to each prompt while voice replies are on and `brief` isn't turned off. The reminder asks Claude to keep its final answer to a few spoken sentences.
 
 The permission hook sends each request to the app over the same Unix socket, `$TMPDIR/notchvoice.sock`, then prints the app's answer as the hook's decision. Claude Code shows its own prompt at the same time. If you answer there first, the hook sees the result in the session transcript and withdraws the card. If the app isn't running, the hook exits straight away, and Claude Code asks as usual.
 
