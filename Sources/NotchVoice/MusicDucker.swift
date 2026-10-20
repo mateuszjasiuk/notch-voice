@@ -22,11 +22,18 @@ final class MusicDucker: @unchecked Sendable {
     }
 
     func restore() {
-        queue.async { [self] in
-            guard let volumes = saved else { return }
-            saved = nil
-            for (app, volume) in volumes { setVolume(app, volume) }
-        }
+        queue.async { [self] in restoreSaved() }
+    }
+
+    // For quitting: waits, so the music is back at its volume before the app exits.
+    func restoreNow() {
+        queue.sync { restoreSaved() }
+    }
+
+    private func restoreSaved() {
+        guard let volumes = saved else { return }
+        saved = nil
+        for (app, volume) in volumes { setVolume(app, volume) }
     }
 
     private func setVolume(_ app: String, _ volume: Int) {

@@ -118,6 +118,13 @@ final class SpeechCenter: ObservableObject {
         ducker.restore()
     }
 
+    // `say` runs on after the app quits unless it is stopped, so it would talk over the next copy of the app.
+    func shutDown() {
+        playback.clear()
+        stopProcess()
+        ducker.restoreNow()
+    }
+
     func setMuted(_ session: Session, _ muted: Bool) {
         sessions.setMuted(sessionID: session.id, muted)
         guard muted else { return }

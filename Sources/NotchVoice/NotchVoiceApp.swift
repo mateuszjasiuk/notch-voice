@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var permissions: PermissionCenter?
     private var speech: SpeechCenter?
     private var server: SocketServer?
+    private var terminationSignal: DispatchSourceSignal?
     private var permissionSetting: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -49,11 +50,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         voice.speak = { speech.say($0) }
         self.speech = speech
         server = makeServer(permissions: permissions, speech: speech)
+        quitCleanlyOnSIGTERM()
         let settings = SettingsWindowController(voice: voice, preferences: preferences)
         self.settings = settings
         notch = NotchController(voice: voice, speech: speech, preferences: preferences, permissions: permissions) { settings.show() }
         NSApp.mainMenu = makeMainMenu()
         LoginItem.enableOnFirstLaunch()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        speech?.shutDown()
+    }
+
+    // install.sh and build.sh stop the app with pkill. Quitting through AppKit instead lets it stop speaking first.
+    private func quitCleanlyOnSIGTERM() {
+        signal(SIGTERM, SIG_IGN)
+        let source = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+        source.setEventHandler { NSApp.terminate(nil) }
+        source.resume()
+        terminationSignal = source
     }
 
     // Requests without a type come from permission hooks installed before types were added.
