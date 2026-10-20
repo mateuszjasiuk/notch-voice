@@ -85,12 +85,13 @@ nv next                 # read the oldest reply you haven't heard
 nv skip                 # go on to the next reply in the queue
 nv stop                 # stop reading and empty the queue
 nv mute web             # stop reading a session's replies (nv unmute web turns them back on)
+nv remove web           # forget a session and its replies
 nv main api             # make api the main session (nv main off goes back to the last session you wrote to)
 nv focus                # treat the session in this folder's worktree as the one you're working in
 nv say "Hello"          # read any text
 ```
 
-A session can be given by the start of its name, or of any word in it, as long as only one session matches. For example, `nv read multi` finds `feature/multi-session-speech`. Replies you ask for play straight away, even while voice replies are switched off. The history lives in the app, so it starts empty each time the app opens.
+When you close a Claude Code session, it leaves the list by itself. To remove one sooner, click ✕ next to it in the notch, or use `nv remove`. A removed session that writes again shows up as new. A session can be given by the start of its name, or of any word in it, as long as only one session matches. For example, `nv read multi` finds `feature/multi-session-speech`. Replies you ask for play straight away, even while voice replies are switched off. The history lives in the app, so it starts empty each time the app opens.
 
 ### Follow your editor
 
@@ -165,9 +166,9 @@ NotchVoice works wherever Claude Code runs on your Mac: in the terminal, in the 
 
 The installer does six things:
 
-1. It copies three hooks to `~/.claude/hooks/`: `speak.py` for voice replies, `notchvoice_permission.py` for permission requests, and `notchvoice_brief.py` for short spoken replies. The speak tool for desktop chats, `notchvoice_mcp.py`, and the `nv` command, `nv.py`, go there too. An existing file with the same name is saved with a `.bak` extension first.
+1. It copies four hooks to `~/.claude/hooks/`: `speak.py` for voice replies, `notchvoice_permission.py` for permission requests, `notchvoice_brief.py` for short spoken replies, and `notchvoice_session_end.py`, which removes closed sessions from the notch. The speak tool for desktop chats, `notchvoice_mcp.py`, and the `nv` command, `nv.py`, go there too. An existing file with the same name is saved with a `.bak` extension first.
 2. It links `~/.local/bin/nv` to `nv.py`, unless a different `nv` is already there, and adds the `/read` and `/main` commands to `~/.claude/commands/`.
-3. It adds the hooks to `~/.claude/settings.json` as `Stop`, `PermissionRequest` and `UserPromptSubmit` hooks, and keeps a backup of that file. It also denies the desktop speak tool there, so Claude Code doesn't read its replies twice.
+3. It adds the hooks to `~/.claude/settings.json` as `Stop`, `PermissionRequest`, `UserPromptSubmit` and `SessionEnd` hooks, and keeps a backup of that file. It also denies the desktop speak tool there, so Claude Code doesn't read its replies twice.
 4. It builds the app on your Mac and puts it in `~/Applications`. Because the app is built locally, macOS doesn't show a security warning.
 5. It starts the app, which then opens at login.
 6. If the Claude desktop app is installed, it adds the speak tool to the app's `claude_desktop_config.json` and keeps a backup of that file. The desktop app rewrites that file while it's open, so if it's open, the installer makes the change again as soon as you quit it.

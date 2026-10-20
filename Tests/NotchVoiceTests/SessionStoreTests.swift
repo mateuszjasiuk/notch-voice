@@ -69,6 +69,19 @@ struct SessionStoreTests {
         }
     }
 
+    @Test func aRemovedSessionStartsOverWhenItWritesAgain() {
+        var store = SessionStore()
+        store.add(sessionID: "a", name: "api", cwd: nil, text: "one")
+        store.add(sessionID: "a", name: "api", cwd: nil, text: "two")
+        store.setMuted(sessionID: "a", true)
+        store.remove(sessionID: "a")
+        #expect(store.session(id: "a") == nil)
+        #expect(store.oldestUnread() == nil)
+        store.add(sessionID: "a", name: "api", cwd: nil, text: "three")
+        #expect(store.session(id: "a")?.replies.map(\.text) == ["three"])
+        #expect(store.session(id: "a")?.isMuted == false)
+    }
+
     @Test func theOldestUnreadReplySkipsMutedSessions() {
         var store = SessionStore()
         let first = store.add(sessionID: "a", name: "api", cwd: nil, text: "first", date: start)

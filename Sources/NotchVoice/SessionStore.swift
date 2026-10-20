@@ -110,6 +110,11 @@ struct SessionStore {
         }
     }
 
+    // A session that writes again after this starts over as a new one.
+    mutating func remove(sessionID: String) {
+        sessions.removeAll { $0.id == sessionID }
+    }
+
     mutating func markRead(sessionID: String, replyID: UUID) {
         update(sessionID) { session in
             if let index = session.replies.firstIndex(where: { $0.id == replyID }) { session.replies[index].isRead = true }

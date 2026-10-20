@@ -29,6 +29,7 @@ permission = load("notchvoice_permission")
 mcp = load("notchvoice_mcp")
 desktop = load("notchvoice_desktop")
 nv = load("nv")
+session_end = load("notchvoice_session_end")
 
 
 def run_main(module, payload):
@@ -215,6 +216,11 @@ class NvTests(unittest.TestCase):
             # speak.py sends the same root with each reply, so the two meet in the app.
             self.assertEqual(speak.worktree_root(os.path.join(project, "apps")), project)
 
+    def test_remove_needs_a_session(self):
+        self.assertEqual(nv.request_for("remove", ["api"]), {"type": "remove", "session": "api"})
+        with self.assertRaises(nv.UsageError):
+            nv.request_for("remove", [])
+
     def test_say_reads_standard_input_without_text(self):
         self.assertEqual(nv.request_for("say", ["-"], stdin=io.StringIO("from a pipe\n")), {"type": "say", "text": "from a pipe"})
         self.assertEqual(nv.request_for("say", [], stdin=io.StringIO("piped")), {"type": "say", "text": "piped"})
@@ -328,6 +334,24 @@ class AlreadySpokenTests(unittest.TestCase):
         self.nv_in_session("say", "hi")
         run_main(brief, {"session_id": "abc-123", "prompt": "next question"})
         self.assertFalse(speak.already_spoken("abc-123"))
+
+
+class SessionEndTests(unittest.TestCase):
+    def test_a_closed_session_asks_the_app_to_remove_it(self):
+        with tempfile.TemporaryDirectory(dir="/tmp") as folder:
+            path = os.path.join(folder, "notch.sock")
+            thread, received = fake_app(path)
+            with mock.patch.object(session_end, "SOCKET", path):
+                run_main(session_end, {"session_id": "abc", "reason": "prompt_input_exit"})
+            thread.join()
+        self.assertEqual(received, [{"type": "remove", "session_id": "abc"}])
+
+    def test_without_the_app_or_a_session_id_nothing_happens(self):
+        with mock.patch.object(session_end, "SOCKET", "/nonexistent/notchvoice.sock"):
+            self.assertEqual(run_main(session_end, {"session_id": "abc"}), "")
+        with mock.patch.object(session_end, "tell_app_removed") as tell:
+            run_main(session_end, {"reason": "other"})
+        tell.assert_not_called()
 
 
 class BriefTests(unittest.TestCase):

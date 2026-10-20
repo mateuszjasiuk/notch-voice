@@ -25,7 +25,8 @@ struct SessionsPanel: View {
                             toggle: { toggle(session.id) },
                             setMain: { speech.setMain(sessionID: $0 ? session.id : nil) },
                             play: { if let latest = session.reply(back: 0) { speech.play(latest, in: session) } },
-                            setMuted: { speech.setMuted(session, $0) }
+                            setMuted: { speech.setMuted(session, $0) },
+                            remove: { withAnimation(.easeOut(duration: 0.18)) { speech.remove(sessionID: session.id) } }
                         )
                         if expanded.contains(session.id) {
                             ReplyList(session: session, speech: speech)
@@ -107,6 +108,7 @@ private struct SessionRow: View {
     let setMain: (Bool) -> Void
     let play: () -> Void
     let setMuted: (Bool) -> Void
+    let remove: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
@@ -171,6 +173,17 @@ private struct SessionRow: View {
             .buttonStyle(.plain)
             .help(session.isMuted ? "Read this session's replies again" : "Stop reading this session's replies")
             .accessibilityLabel(session.isMuted ? "Unmute \(session.name)" : "Mute \(session.name)")
+
+            Button(action: remove) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.35))
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Remove this session and its replies")
+            .accessibilityLabel("Remove \(session.name)")
         }
         .padding(.vertical, 2)
     }

@@ -110,6 +110,15 @@ final class SpeechCenter: ObservableObject {
         mainSessionID = sessionID
     }
 
+    // Takes the session's replies out of the queue. A reply already being read finishes, because a session usually
+    // ends right after its last reply and cutting that off would be abrupt.
+    func remove(sessionID: String) {
+        sessions.remove(sessionID: sessionID)
+        playback.removeWaiting { $0.sessionID == sessionID }
+        if mainSessionID == sessionID { mainSessionID = nil }
+        if focus == .session(sessionID) { focus = nil }
+    }
+
     // Before the first prompt there is nothing to go on, so every session counts. Desktop chats have no prompt hook,
     // and their speak tool is only called in the chat the user is looking at.
     private func isFocused(_ session: Session) -> Bool {
@@ -278,6 +287,17 @@ extension SpeechCenter {
             guard let query = request["session"] as? String, !query.isEmpty else { return failure("Say which session to make main.") }
             return withSession(request) { session in
                 setMain(sessionID: session.id)
+                return ["ok": true, "session": session.name]
+            }
+        case "remove":
+            // The SessionEnd hook sends the id; it is fine if that session never replied.
+            if let sessionID = request["session_id"] as? String, !sessionID.isEmpty {
+                remove(sessionID: sessionID)
+                return ["ok": true]
+            }
+            guard let query = request["session"] as? String, !query.isEmpty else { return failure("Say which session to remove.") }
+            return withSession(request) { session in
+                remove(sessionID: session.id)
                 return ["ok": true, "session": session.name]
             }
         case "say":

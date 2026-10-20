@@ -23,7 +23,7 @@ if os.path.exists(path):
     with open(path) as f:
         settings = json.load(f)
     hooks = settings.get("hooks", {})
-    for event, script in (("Stop", "speak.py"), ("PermissionRequest", "notchvoice_permission.py"), ("UserPromptSubmit", "notchvoice_brief.py")):
+    for event, script in (("Stop", "speak.py"), ("PermissionRequest", "notchvoice_permission.py"), ("UserPromptSubmit", "notchvoice_brief.py"), ("SessionEnd", "notchvoice_session_end.py")):
         groups = []
         for group in hooks.get(event, []):
             group["hooks"] = [h for h in group.get("hooks", []) if script not in h.get("command", "")]
@@ -54,7 +54,7 @@ EOF
       rm -f "$COMMANDS/$command"
     fi
   done
-  rm -f "$HOOKS/speak.py" "$HOOKS/notchvoice_permission.py" "$HOOKS/notchvoice_brief.py" "$HOOKS/notchvoice_mcp.py" "$HOOKS/nv.py" "$HOME/.claude/tts_off" "$HOME/.claude/tts_settings.json"
+  rm -f "$HOOKS/speak.py" "$HOOKS/notchvoice_permission.py" "$HOOKS/notchvoice_brief.py" "$HOOKS/notchvoice_mcp.py" "$HOOKS/notchvoice_session_end.py" "$HOOKS/nv.py" "$HOME/.claude/tts_off" "$HOME/.claude/tts_settings.json"
   python3 hook/notchvoice_desktop.py
   echo "NotchVoice and its hooks are removed. Restart Claude Code."
   exit 0
@@ -66,7 +66,7 @@ if ! command -v swift >/dev/null 2>&1; then
 fi
 
 mkdir -p "$HOOKS"
-for script in speak.py notchvoice_permission.py notchvoice_brief.py notchvoice_mcp.py nv.py; do
+for script in speak.py notchvoice_permission.py notchvoice_brief.py notchvoice_mcp.py notchvoice_session_end.py nv.py; do
   if [[ -f "$HOOKS/$script" ]] && ! cmp -s "hook/$script" "$HOOKS/$script"; then
     cp "$HOOKS/$script" "$HOOKS/$script.bak"
     echo "Saved your previous $script as $HOOKS/$script.bak"
@@ -112,6 +112,7 @@ wanted = {
     "Stop": {"type": "command", "command": "python3 ~/.claude/hooks/speak.py", "async": True, "timeout": 300},
     "PermissionRequest": {"type": "command", "command": "python3 ~/.claude/hooks/notchvoice_permission.py", "timeout": 600},
     "UserPromptSubmit": {"type": "command", "command": "python3 ~/.claude/hooks/notchvoice_brief.py", "timeout": 10},
+    "SessionEnd": {"type": "command", "command": "python3 ~/.claude/hooks/notchvoice_session_end.py", "timeout": 5},
 }
 hooks = settings.setdefault("hooks", {})
 added = []

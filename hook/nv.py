@@ -8,6 +8,7 @@
   nv skip                      go on to the next reply in the queue
   nv stop                      stop reading and empty the queue
   nv mute <session>            stop reading a session's replies; nv unmute <session> turns them back on
+  nv remove <session>          forget a session and its replies (closed sessions go by themselves)
   nv focus [folder]            treat the session in this folder's git worktree as the one you're working in, as if
                                you had just written to it (for editor hooks; the folder defaults to the current one)
   nv main [session]            make a session the main one: its replies are read, the others only announced.
@@ -25,7 +26,7 @@ import sys
 import tempfile
 
 DARWIN_USER_TEMP_DIR = 65537  # _CS_DARWIN_USER_TEMP_DIR in <unistd.h>
-COMMANDS = ("list", "read", "history", "next", "skip", "stop", "mute", "unmute", "focus", "main", "say")
+COMMANDS = ("list", "read", "history", "next", "skip", "stop", "mute", "unmute", "remove", "focus", "main", "say")
 
 
 def user_temp_dir():
@@ -69,7 +70,7 @@ def request_for(command, args, stdin=sys.stdin):
     if command == "history":
         session, count = session_and_number(args)
         return {"type": "history", "session": session, **({"count": count} if count else {})}
-    if command in ("mute", "unmute"):
+    if command in ("mute", "unmute", "remove"):
         if len(args) != 1:
             raise UsageError(f"nv {command} needs a session.")
         return {"type": command, "session": args[0]}
@@ -197,7 +198,7 @@ def main(argv=None):
         print(describe_history(answer))
     elif command == "read":
         print(f"Reading {answer.get('session')}.")
-    elif command in ("mute", "unmute"):
+    elif command in ("mute", "unmute", "remove"):
         print(f"{answer.get('session')} is {command}d.")
     elif command == "main":
         print("No main session now." if request.get("off") else f"{answer.get('session')} is the main session.")

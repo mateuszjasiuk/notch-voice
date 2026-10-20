@@ -5,10 +5,11 @@ Thanks for helping out. NotchVoice is a small project, so focused pull requests 
 ## How the project fits together
 
 - **`Sources/NotchVoice/`** is the macOS app, built with SwiftUI and AppKit in Swift 6. It draws the notch panel, the glow and the settings window.
-- **`hook/`** holds the three Claude Code hooks. They are Python scripts that use only the standard library:
+- **`hook/`** holds the four Claude Code hooks. They are Python scripts that use only the standard library:
   - `speak.py` is the `Stop` hook. It sends each reply to the app, which reads it aloud. When the app isn't running, it speaks the reply itself.
   - `notchvoice_permission.py` is the `PermissionRequest` hook. It sends permission requests to the notch.
   - `notchvoice_brief.py` is the `UserPromptSubmit` hook. It asks Claude to keep spoken replies short, and tells the app which session you are working in.
+  - `notchvoice_session_end.py` is the `SessionEnd` hook. It tells the app to remove the session when it closes.
 - **`hook/notchvoice_mcp.py`** is a small MCP server for chats in the Claude desktop app. Its `speak` tool runs `speak.py` with the text Claude passes in.
 - **`hook/nv.py`** is the `nv` command. It sends requests to the app over the socket and prints the answers.
 - **`commands/read.md`** is the `/read` command for Claude Code. It tells Claude to find the passage the user asked for and read it with `nv say`.
@@ -37,6 +38,7 @@ The `type` field says what the request is:
 | `next` | | Reads the oldest unread reply, leaving out muted sessions. |
 | `skip` | | Stops what is being read and goes on to the next reply in the queue. |
 | `stop` | | Stops what is being read and empties the queue. |
+| `remove` | `session_id` or `session` | Forgets the session: its replies, its unread count and its replies waiting in the queue. A reply already being read finishes. If it was the main session or the one in focus, that is cleared too. If the session writes again, it shows up as new. |
 | `mute`, `unmute` | `session` | Stops or starts reading a session's replies. Its replies are still saved. |
 
 `session` can be a session's name, its id, or the start of either, as long as only one session matches. If nothing matches that way, the start of any word in the name also works, so `multi` finds `feature/multi-session-speech`. Without `session`, the app uses the session that replied most recently.
