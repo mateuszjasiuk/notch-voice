@@ -39,7 +39,7 @@ The `type` field says what the request is:
 | `stop` | | Stops what is being read and empties the queue. |
 | `mute`, `unmute` | `session` | Stops or starts reading a session's replies. Its replies are still saved. |
 
-`session` can be a session's name, its id, or the start of either, as long as only one session matches. Without `session`, the app uses the session that replied most recently.
+`session` can be a session's name, its id, or the start of either, as long as only one session matches. If nothing matches that way, the start of any word in the name also works, so `multi` finds `feature/multi-session-speech`. Without `session`, the app uses the session that replied most recently.
 
 Requests that you make yourself (`say`, `read`, `next`) play even while voice replies are switched off. If they cut off a reply, that reply goes back to the front of the queue and is read again from the start afterwards. The app keeps history in memory only, so it starts empty each time the app opens.
 

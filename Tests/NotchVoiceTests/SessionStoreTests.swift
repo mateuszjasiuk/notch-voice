@@ -56,6 +56,19 @@ struct SessionStoreTests {
         #expect(throws: SessionLookupError.notFound("x")) { try store.session(matching: "x").get() }
     }
 
+    @Test func sessionsAreFoundByTheStartOfAnyWordInTheirName() throws {
+        var store = SessionStore()
+        store.add(sessionID: "id-1", name: "feature/multi-session-speech", cwd: nil, text: "x")
+        store.add(sessionID: "id-2", name: "sch-599-supplement-percentage", cwd: nil, text: "x")
+        store.add(sessionID: "id-3", name: "fix/session-names", cwd: nil, text: "x")
+        #expect(try store.session(matching: "multi").get().id == "id-1")
+        #expect(try store.session(matching: "suppl").get().id == "id-2")
+        #expect(try store.session(matching: "fix").get().id == "id-3")
+        #expect(throws: SessionLookupError.ambiguous("session", ["fix/session-names", "feature/multi-session-speech"])) {
+            try store.session(matching: "session").get()
+        }
+    }
+
     @Test func theOldestUnreadReplySkipsMutedSessions() {
         var store = SessionStore()
         let first = store.add(sessionID: "a", name: "api", cwd: nil, text: "first", date: start)

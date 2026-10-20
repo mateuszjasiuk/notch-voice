@@ -87,13 +87,19 @@ struct SessionStore {
         sessions.first { $0.id == id }
     }
 
-    // An exact name or id wins; otherwise the query must be the start of exactly one name or id.
+    // An exact name or id wins. Then the start of a name or id, and then the start of any word in a name, so
+    // "multi" finds "feature/multi-session-speech", whose name is spoken as "multi session speech".
     func session(matching query: String) -> Result<Session, SessionLookupError> {
         let query = query.lowercased()
         if let exact = sessions.first(where: { $0.name.lowercased() == query || $0.id.lowercased() == query }) {
             return .success(exact)
         }
-        let matches = sessions.filter { $0.name.lowercased().hasPrefix(query) || $0.id.lowercased().hasPrefix(query) }
+        var matches = sessions.filter { $0.name.lowercased().hasPrefix(query) || $0.id.lowercased().hasPrefix(query) }
+        if matches.isEmpty {
+            matches = sessions.filter { session in
+                session.name.lowercased().split { "/_-. ".contains($0) }.contains { $0.hasPrefix(query) }
+            }
+        }
         switch matches.count {
         case 0: return .failure(.notFound(query))
         case 1: return .success(matches[0])

@@ -89,7 +89,7 @@ nv main api             # make api the main session (nv main off goes back to th
 nv say "Hello"          # read any text
 ```
 
-A session can be given by the start of its name, as long as only one session matches. Replies you ask for play straight away, even while voice replies are switched off. The history lives in the app, so it starts empty each time the app opens.
+A session can be given by the start of its name, or of any word in it, as long as only one session matches. For example, `nv read multi` finds `feature/multi-session-speech`. Replies you ask for play straight away, even while voice replies are switched off. The history lives in the app, so it starts empty each time the app opens.
 
 ### Ask Claude to read something: `/read`
 
