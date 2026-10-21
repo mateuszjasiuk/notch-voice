@@ -39,7 +39,7 @@ The `type` field says what the request is:
 | `skip` | | Stops what is being read and goes on to the next reply in the queue. |
 | `stop` | | Stops what is being read and empties the queue. |
 | `remove` | `session_id` or `session` | Forgets the session: its replies, its unread count and its replies waiting in the queue. A reply already being read finishes. If it was the main session or the one in focus, that is cleared too. If the session writes again, it shows up as new. |
-| `mute`, `unmute` | `session` | Stops or starts reading a session's replies. Its replies are still saved. |
+| `mute`, `unmute` | `session` | Stops or starts reading a session's replies. Its replies are still saved, marked as heard, as are all replies that arrive while voice replies are off. |
 
 `session` can be a session's name, its id, or the start of either, as long as only one session matches. If nothing matches that way, the start of any word in the name also works, so `multi` finds `feature/multi-session-speech`. Without `session`, the app uses the session that replied most recently.
 

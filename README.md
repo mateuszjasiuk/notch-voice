@@ -195,7 +195,7 @@ If the app isn't running, the Stop hook reads the reply aloud itself, as before.
 
 | File | Written by | Used for |
 | --- | --- | --- |
-| `~/.claude/tts_off` | The switch | While this file exists, nothing is read aloud. The app still keeps the replies. |
+| `~/.claude/tts_off` | The switch | While this file exists, nothing is read aloud. The app still keeps the replies, marked as heard. |
 | `~/.claude/tts_settings.json` | The settings window | Holds `voice`, `rate` (words per minute), `duck` (how loud the music stays, from 0 to 1) and `brief` (the short-replies reminder). |
 | `$TMPDIR/claude_tts_owner` | The hook | Used only when the app isn't running. Holds `<hook pid> <say pid>` while the hook speaks a reply. |
 

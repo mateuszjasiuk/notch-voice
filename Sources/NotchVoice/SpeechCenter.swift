@@ -90,7 +90,12 @@ final class SpeechCenter: ObservableObject {
         let reply = sessions.add(sessionID: sessionID, name: name, cwd: cwd, root: root, text: text, date: date)
         guard let session = sessions.session(id: sessionID) else { return }
         voice.refresh()
-        guard voice.isEnabled, !session.isMuted else { return }
+        guard voice.isEnabled, !session.isMuted else {
+            // With voice off, or the session muted, the user isn't listening for it, so it doesn't count as unread.
+            // It stays in the history to be played later.
+            sessions.markRead(sessionID: sessionID, replyID: reply.id)
+            return
+        }
         switch mode() {
         case .focusedSession where isFocused(session):
             // You know which session you're working in, so its replies skip the name.
