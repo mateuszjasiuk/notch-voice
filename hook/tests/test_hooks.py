@@ -216,6 +216,10 @@ class NvTests(unittest.TestCase):
             # speak.py sends the same root with each reply, so the two meet in the app.
             self.assertEqual(speak.worktree_root(os.path.join(project, "apps")), project)
 
+    def test_markread_without_a_session_covers_every_session(self):
+        self.assertEqual(nv.request_for("markread", []), {"type": "markread", "session": ""})
+        self.assertEqual(nv.request_for("markread", ["api"]), {"type": "markread", "session": "api"})
+
     def test_remove_needs_a_session(self):
         self.assertEqual(nv.request_for("remove", ["api"]), {"type": "remove", "session": "api"})
         with self.assertRaises(nv.UsageError):
@@ -356,9 +360,11 @@ class SessionEndTests(unittest.TestCase):
 
 class BriefTests(unittest.TestCase):
     def setUp(self):
-        patcher = mock.patch.object(brief, "SOCKET", "/nonexistent/notchvoice.sock")
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        # The real mute file would make these tests fail whenever voice replies are off on this machine.
+        for name, path in (("SOCKET", "/nonexistent/notchvoice.sock"), ("MUTE_FILE", "/nonexistent/tts_off")):
+            patcher = mock.patch.object(brief, name, path)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
     def test_tells_the_app_which_session_the_user_is_working_in(self):
         with tempfile.TemporaryDirectory(dir="/tmp") as folder:
