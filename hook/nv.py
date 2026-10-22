@@ -5,6 +5,7 @@
   nv read [session] [n]        read the latest reply, or the n-th one before it (1 is the one before the latest)
   nv history [session] [n]     print the last n replies (add --json for the raw answer)
   nv next                      read the oldest unread reply
+  nv markread [session]        count a session's replies as heard without reading them; with no session, all of them
   nv skip                      go on to the next reply in the queue
   nv stop                      stop reading and empty the queue
   nv mute <session>            stop reading a session's replies; nv unmute <session> turns them back on
@@ -15,7 +16,8 @@
                                Inside Claude Code, without a session, it's that session. nv main off undoes it.
   nv say <text>                read any text; with no text, or "-", it reads standard input
 
-A session is its name, or the start of it. Without one, nv uses the session that replied most recently.
+A session is its name, or the start of it. Without one, nv uses the session that replied most recently
+(except nv markread, which then covers every session).
 """
 import json
 import os
@@ -26,7 +28,7 @@ import sys
 import tempfile
 
 DARWIN_USER_TEMP_DIR = 65537  # _CS_DARWIN_USER_TEMP_DIR in <unistd.h>
-COMMANDS = ("list", "read", "history", "next", "skip", "stop", "mute", "unmute", "remove", "focus", "main", "say")
+COMMANDS = ("list", "read", "history", "next", "markread", "skip", "stop", "mute", "unmute", "remove", "focus", "main", "say")
 
 
 def user_temp_dir():
@@ -70,6 +72,10 @@ def request_for(command, args, stdin=sys.stdin):
     if command == "history":
         session, count = session_and_number(args)
         return {"type": "history", "session": session, **({"count": count} if count else {})}
+    if command == "markread":
+        if len(args) > 1:
+            raise UsageError("nv markread takes one session at most.")
+        return {"type": "markread", "session": args[0] if args else ""}
     if command in ("mute", "unmute", "remove"):
         if len(args) != 1:
             raise UsageError(f"nv {command} needs a session.")
@@ -200,6 +206,8 @@ def main(argv=None):
         print(f"Reading {answer.get('session')}.")
     elif command in ("mute", "unmute", "remove"):
         print(f"{answer.get('session')} is {command}d.")
+    elif command == "markread":
+        print(f"{answer['session']}'s replies are marked as read." if answer.get("session") else "All replies are marked as read.")
     elif command == "main":
         print("No main session now." if request.get("off") else f"{answer.get('session')} is the main session.")
     return 0

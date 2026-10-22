@@ -82,6 +82,7 @@ nv read                 # read the latest reply again
 nv read api 1           # the reply before the latest one, from the session whose name starts with "api"
 nv history api          # print the session's recent replies
 nv next                 # read the oldest reply you haven't heard
+nv markread             # count all replies as heard without reading them (nv markread api: only api)
 nv skip                 # go on to the next reply in the queue
 nv stop                 # stop reading and empty the queue
 nv mute web             # stop reading a session's replies (nv unmute web turns them back on)

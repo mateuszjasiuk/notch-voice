@@ -87,9 +87,32 @@ struct SessionStoreTests {
         let first = store.add(sessionID: "a", name: "api", cwd: nil, text: "first", date: start)
         store.add(sessionID: "b", name: "web", cwd: nil, text: "second", date: start + 1)
         #expect(store.oldestUnread()?.reply.text == "first")
-        store.markRead(sessionID: "a", replyID: first.id)
+        store.markRead(sessionID: "a", through: first.id)
         #expect(store.oldestUnread()?.reply.text == "second")
         store.setMuted(sessionID: "b", true)
+        #expect(store.oldestUnread() == nil)
+    }
+
+    @Test func readingAReplyAlsoReadsTheOnesBeforeIt() {
+        var store = SessionStore()
+        store.add(sessionID: "a", name: "api", cwd: nil, text: "one")
+        let two = store.add(sessionID: "a", name: "api", cwd: nil, text: "two")
+        store.add(sessionID: "a", name: "api", cwd: nil, text: "three")
+        store.add(sessionID: "b", name: "web", cwd: nil, text: "other")
+        store.markRead(sessionID: "a", through: two.id)
+        #expect(store.session(id: "a")?.replies.map(\.isRead) == [true, true, false])
+        #expect(store.session(id: "b")?.unreadCount == 1)
+    }
+
+    @Test func markAllReadCoversOneSessionOrAll() {
+        var store = SessionStore()
+        store.add(sessionID: "a", name: "api", cwd: nil, text: "one")
+        store.add(sessionID: "a", name: "api", cwd: nil, text: "two")
+        store.add(sessionID: "b", name: "web", cwd: nil, text: "other")
+        store.markAllRead(sessionID: "a")
+        #expect(store.session(id: "a")?.unreadCount == 0)
+        #expect(store.session(id: "b")?.unreadCount == 1)
+        store.markAllRead()
         #expect(store.oldestUnread() == nil)
     }
 

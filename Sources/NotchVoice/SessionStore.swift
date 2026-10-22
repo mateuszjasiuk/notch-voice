@@ -115,9 +115,18 @@ struct SessionStore {
         sessions.removeAll { $0.id == sessionID }
     }
 
-    mutating func markRead(sessionID: String, replyID: UUID) {
+    // Someone who heard a reply has caught up with that session, so the replies before it count as read too.
+    mutating func markRead(sessionID: String, through replyID: UUID) {
         update(sessionID) { session in
-            if let index = session.replies.firstIndex(where: { $0.id == replyID }) { session.replies[index].isRead = true }
+            guard let index = session.replies.firstIndex(where: { $0.id == replyID }) else { return }
+            for earlier in 0...index { session.replies[earlier].isRead = true }
+        }
+    }
+
+    // Without a session id, every session.
+    mutating func markAllRead(sessionID: String? = nil) {
+        for index in sessions.indices where sessionID == nil || sessions[index].id == sessionID {
+            for reply in sessions[index].replies.indices { sessions[index].replies[reply].isRead = true }
         }
     }
 

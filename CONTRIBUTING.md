@@ -34,11 +34,12 @@ The `type` field says what the request is:
 | `say` | `text` | Reads the text straight away. |
 | `list` | | Answers with `sessions`, each with `id`, `name`, `cwd`, `unread`, `replies`, `muted` and `last_activity`, plus `mode`, `speaking` and `waiting`. |
 | `history` | `session`, `count` | Answers with `replies`, latest first. Each has `index` (0 is the latest), `text`, `date` and `read`. |
-| `read` | `session`, `back` | Reads a reply straight away. `back` is 0 for the latest reply, 1 for the one before it, and so on. |
+| `read` | `session`, `back` | Reads a reply straight away. `back` is 0 for the latest reply, 1 for the one before it, and so on. Hearing a reply also counts the session's earlier replies as heard. |
 | `next` | | Reads the oldest unread reply, leaving out muted sessions. |
 | `skip` | | Stops what is being read and goes on to the next reply in the queue. |
 | `stop` | | Stops what is being read and empties the queue. |
 | `remove` | `session_id` or `session` | Forgets the session: its replies, its unread count and its replies waiting in the queue. A reply already being read finishes. If it was the main session or the one in focus, that is cleared too. If the session writes again, it shows up as new. |
+| `markread` | `session` | Counts the session's replies as heard without reading them, and drops the ones waiting in the queue. Without `session`, it does this for every session. |
 | `mute`, `unmute` | `session` | Stops or starts reading a session's replies. Its replies are still saved, marked as heard, as are all replies that arrive while voice replies are off. |
 
 `session` can be a session's name, its id, or the start of either, as long as only one session matches. If nothing matches that way, the start of any word in the name also works, so `multi` finds `feature/multi-session-speech`. Without `session`, the app uses the session that replied most recently.

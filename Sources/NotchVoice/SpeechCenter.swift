@@ -93,7 +93,7 @@ final class SpeechCenter: ObservableObject {
         guard voice.isEnabled, !session.isMuted else {
             // With voice off, or the session muted, the user isn't listening for it, so it doesn't count as unread.
             // It stays in the history to be played later.
-            sessions.markRead(sessionID: sessionID, replyID: reply.id)
+            sessions.markRead(sessionID: sessionID, through: reply.id)
             return
         }
         switch mode() {
@@ -173,6 +173,13 @@ final class SpeechCenter: ObservableObject {
         ducker.restoreNow()
     }
 
+    // Without a session id, every session. Replies and announcements waiting to be read by themselves go too, but
+    // what is being read now finishes.
+    func markAllRead(sessionID: String? = nil) {
+        sessions.markAllRead(sessionID: sessionID)
+        playback.removeWaiting { !$0.isRequested && (sessionID == nil || $0.sessionID == sessionID) }
+    }
+
     func setMuted(_ session: Session, _ muted: Bool) {
         sessions.setMuted(sessionID: session.id, muted)
         guard muted else { return }
@@ -207,7 +214,10 @@ final class SpeechCenter: ObservableObject {
     private func start(_ utterance: Utterance) {
         stopProcess()
         if let sessionID = utterance.sessionID, let replyID = utterance.replyID {
-            sessions.markRead(sessionID: sessionID, replyID: replyID)
+            sessions.markRead(sessionID: sessionID, through: replyID)
+            // Earlier replies from the same session now count as heard, so they aren't read by themselves later.
+            let read = Set(sessions.session(id: sessionID)?.replies.filter(\.isRead).map(\.id) ?? [])
+            playback.removeWaiting { !$0.isRequested && $0.replyID.map(read.contains) == true }
         }
         ducker.duck(to: voice.musicVolume)
         // A file rather than a pipe, so a long reply never blocks on a full pipe and a stopped say can't SIGPIPE us.
@@ -344,6 +354,16 @@ extension SpeechCenter {
         case "stop":
             stop()
             return ["ok": true]
+        case "markread":
+            // Unlike the other requests, no session means every session.
+            guard let query = request["session"] as? String, !query.isEmpty else {
+                markAllRead()
+                return ["ok": true]
+            }
+            return withSession(request) { session in
+                markAllRead(sessionID: session.id)
+                return ["ok": true, "session": session.name]
+            }
         case "mute", "unmute":
             let muted = request["type"] as? String == "mute"
             return withSession(request) { session in

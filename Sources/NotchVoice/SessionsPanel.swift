@@ -77,6 +77,7 @@ private struct NowPlayingRow: View {
                     .foregroundStyle(.white.opacity(0.5))
                 Spacer(minLength: 8)
                 if unread > 0 {
+                    RoundIconButton(symbol: "checkmark", label: "Mark all as read") { speech.markAllRead() }
                     Button { speech.playNextUnread() } label: {
                         Label("Play next", systemImage: "play.fill")
                             .font(.system(size: 11, weight: .semibold))
